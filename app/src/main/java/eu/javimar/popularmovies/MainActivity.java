@@ -4,15 +4,15 @@ import android.app.LoaderManager;
 import android.content.Intent;
 import android.content.Loader;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.net.Uri;
+import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -22,7 +22,11 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
+import butterknife.BindView;
+import butterknife.ButterKnife;
 import eu.javimar.popularmovies.model.Movie;
+import eu.javimar.popularmovies.model.MovieLoader;
+import eu.javimar.popularmovies.view.MovieAdapter;
 
 @SuppressWarnings("all")
 public class MainActivity extends AppCompatActivity implements
@@ -32,21 +36,29 @@ public class MainActivity extends AppCompatActivity implements
 {
     private static final String LOG_TAG = MainActivity.class.getSimpleName();
 
-    private RecyclerView mRecyclerView;
-    private MovieAdapter mMovieAdapter;
+    @BindView(R.id.toolbar) Toolbar toolbar;
+    @BindView(R.id.collapse_toolbar) CollapsingToolbarLayout collapsingToolbarLayout;
+    @BindView(R.id.recycler_view_movies) RecyclerView mRecyclerView;
+    @BindView(R.id.tv_error_message_display) TextView mErrorMessageDisplay;
+    @BindView(R.id.pb_loading_indicator) ProgressBar mLoadingIndicator;
 
-    private TextView mErrorMessageDisplay;
-    private ProgressBar mLoadingIndicator;
+    private MovieAdapter mMovieAdapter;
 
     private static final int MOVIE_LOADER_ID = 0;
 
-    /** To check if we are connected to the Internet */
+    /**
+     * To check if we are connected to the Internet
+     */
     boolean hasConnectivity = false;
 
-    /** The Master List of MOVIES where everything revolves around */
+    /**
+     * The Master List of MOVIES where everything revolves around
+     */
     public static List<Movie> master_list = new ArrayList<>();
 
-    /** URL bits and pieces for the themoviedb.org */
+    /**
+     * URL bits and pieces for the themoviedb.org
+     */
     private static final String BASE_URL = "http://api.themoviedb.org/3";
     private static final String TOP_RATED = "movie/top_rated";
     private static final String POPULAR = "movie/popular";
@@ -59,12 +71,11 @@ public class MainActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        ButterKnife.bind(this);
+
         // enable tool bar and disable collapsing toolbar title
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setTitle(R.string.app_name);
-        final CollapsingToolbarLayout collapsingToolbarLayout =
-                (CollapsingToolbarLayout) findViewById(R.id.collapse_toolbar);
         collapsingToolbarLayout.setTitleEnabled(false);
 
         // add support for preferences changes callback
@@ -72,21 +83,23 @@ public class MainActivity extends AppCompatActivity implements
                 .getDefaultSharedPreferences(this)
                 .registerOnSharedPreferenceChangeListener(this);
 
-        // recycler view init
-        mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view_movies);
-        // This TextView is used to display errors and will be hidden if no errors
-        mErrorMessageDisplay = (TextView) findViewById(R.id.tv_error_message_display);
-
-        GridLayoutManager gridLayoutManager = new GridLayoutManager(this,2);
-        mRecyclerView.setLayoutManager(gridLayoutManager);
+        // have different column count depending on the orientation (landscape or portrait),
+        // If we added support for tablets, we must use the resources for simplicity
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT)
+        {
+            mRecyclerView.setLayoutManager(new GridLayoutManager(this, 2));
+        }
+        else
+        {
+            mRecyclerView.setLayoutManager(new GridLayoutManager(this, 4));
+        }
         mRecyclerView.setHasFixedSize(true);
 
         // link movie data with the Views
         mMovieAdapter = new MovieAdapter(this, this);
         // Setting the adapter attaches it to the RecyclerView in our layout
         mRecyclerView.setAdapter(mMovieAdapter);
-        // get a reference to the progress bar
-        mLoadingIndicator = (ProgressBar)findViewById(R.id.pb_loading_indicator);
+
         // start loader
         startServerLoader();
     }
@@ -115,11 +128,10 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
-    protected void onStart()
-    {
+    protected void onStart() {
         super.onStart();
         // update subtitle on screen rotation
-        if(getPreferenceOrderBy().equals(getString(R.string.settings_order_by_popular_value)))
+        if (getPreferenceOrderBy().equals(getString(R.string.settings_order_by_popular_value)))
         {
             getSupportActionBar().setSubtitle(R.string.settings_order_by_popular_label);
         }
@@ -129,7 +141,9 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    /** LOADER METHODS */
+    /**
+     * LOADER METHODS
+     */
     @Override
     public Loader<List<Movie>> onCreateLoader(int id, Bundle args)
     {
@@ -137,7 +151,7 @@ public class MainActivity extends AppCompatActivity implements
         Uri baseUri = Uri.parse(BASE_URL);
         Uri.Builder uriBuilder = baseUri.buildUpon();
 
-        if(getPreferenceOrderBy().equals(getString(R.string.settings_order_by_popular_value)))
+        if (getPreferenceOrderBy().equals(getString(R.string.settings_order_by_popular_value)))
         {
             getSupportActionBar().setSubtitle(R.string.settings_order_by_popular_label);
             uriBuilder.appendEncodedPath(POPULAR);
@@ -156,19 +170,18 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onLoadFinished(Loader<List<Movie>> loader, List<Movie> movies)
     {
-        // Hide loading indicator because the data has been loaded
-        mLoadingIndicator.setVisibility(View.GONE);
-
         // If there is a valid list of movies, then add them to the adapter's data set.
         if (movies != null && !movies.isEmpty())
         {
+            // Hide loading indicator because the data has been loaded OK
+            mLoadingIndicator.setVisibility(View.GONE);
+            // swap old data with new data
             mMovieAdapter.swap(movies);
         }
     }
 
     @Override
-    public void onLoaderReset(Loader<List<Movie>> loader)
-    {
+    public void onLoaderReset(Loader<List<Movie>> loader) {
         // Clear out our old data
     }
 
@@ -183,7 +196,9 @@ public class MainActivity extends AppCompatActivity implements
     }
 
 
-    /** Gives me the exact movie being clicked so that I can display its detail */
+    /**
+     * Gives me the exact movie being clicked so that I can display its detail
+     */
     @Override
     public void onListItemClick(int clickedItemIndex)
     {
@@ -193,20 +208,22 @@ public class MainActivity extends AppCompatActivity implements
     }
 
 
-    /** MENU OPTIONS */
+    /**
+     * MENU OPTIONS
+     */
     @Override
     public boolean onCreateOptionsMenu(Menu menu)
     {
         getMenuInflater().inflate(R.menu.menu_main, menu);
         return true;
     }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item)
     {
         int id = item.getItemId();
         Intent i;
-        switch (id)
-        {
+        switch (id) {
             case R.id.action_settings:
                 i = new Intent(this, SettingsActivity.class);
                 startActivity(i);
@@ -214,7 +231,6 @@ public class MainActivity extends AppCompatActivity implements
         }
         return super.onOptionsItemSelected(item);
     }
-
 
 
     @Override

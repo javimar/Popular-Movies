@@ -1,10 +1,11 @@
-package eu.javimar.popularmovies;
+package eu.javimar.popularmovies.model;
 
 import android.content.AsyncTaskLoader;
 import android.content.Context;
 
 import java.util.List;
 
+import eu.javimar.popularmovies.Utils;
 import eu.javimar.popularmovies.model.Movie;
 
 
