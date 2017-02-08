@@ -10,18 +10,16 @@ public class Movie implements Parcelable
     private String mOverview;
     private String mReleaseDate;
     private double mVoteAverage;
-    private double mPopularity;
     private String mPosterPath;
 
     public Movie(int id, String title, String overview, String releaseDate,
-                  double voteAverage, double popularity, String poster)
+                  double voteAverage, String poster)
     {
         this.mId = id;
         this.mPosterPath = poster;
         this.mOverview = overview;
         this.mReleaseDate = releaseDate;
         this.mTitle = title;
-        this.mPopularity = popularity;
         this.mVoteAverage = voteAverage;
     }
 
@@ -35,7 +33,6 @@ public class Movie implements Parcelable
         mOverview = in.readString();
         mReleaseDate = in.readString();
         mVoteAverage = in.readDouble();
-        mPopularity = in.readDouble();
         mPosterPath = in.readString();
     }
 
@@ -50,7 +47,6 @@ public class Movie implements Parcelable
         dest.writeString(mOverview);
         dest.writeString(mReleaseDate);
         dest.writeDouble(mVoteAverage);
-        dest.writeDouble(mPopularity);
         dest.writeString(mPosterPath);
     }
 
@@ -93,6 +89,9 @@ public class Movie implements Parcelable
     public String getmPosterPath() {
         return mPosterPath;
     }
+    public int getmId() {
+        return mId;
+    }
 
     @Override
     public String toString() {
@@ -102,7 +101,6 @@ public class Movie implements Parcelable
                 ", Overview='" + mOverview + '\'' +
                 ", ReleaseDate='" + mReleaseDate + '\'' +
                 ", VoteAverage=" + mVoteAverage +
-                ", Popularity=" + mPopularity +
                 ", PosterPath='" + mPosterPath + '\'' +
                 '}';
     }

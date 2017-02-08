@@ -1,6 +1,7 @@
 package eu.javimar.popularmovies;
-
+import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
@@ -26,26 +27,30 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
-import eu.javimar.popularmovies.model.Movie;
+import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
 
-import static eu.javimar.popularmovies.MainActivity.master_list;
 
 @SuppressWarnings("All")
 public final class Utils
 {
     private static final String LOG_TAG = Utils.class.getName();
 
-    public static final String BASE_POSTER_URL = "http://image.tmdb.org/t/p";
-    public static final String SIZE185 = "w185";
-    public static final String SIZE500 = "w500";
-    public static final String SIZE342 = "w342";
+    private static final String BASE_POSTER_URL = "http://image.tmdb.org/t/p";
+    private static final String SIZE185 = "w185";
+    private static final String SIZE500 = "w500";
+    private static final String SIZE342 = "w342";
 
-    public static final int MOVIE_ADAPTER = 90;
-    public static final int DETAIL_ACTIVITY = 91;
+    public static final int MOVIE_ADAPTER = 60;
+    public static final int DETAIL_ACTIVITY = 61;
 
-    public static List<Movie> fetchMoviesData(String requestUrl)
+    private static String sMovieType;
+
+
+    public static List<ContentValues> fetchMoviesData(String requestUrl, String movieType)
     {
-        //  this is the only public method here that the EarthquakeAsyncTask needs to interact with
+        // which movie is it
+        sMovieType = movieType;
+
         // Create URL object
         URL url = createUrl(requestUrl);
 
@@ -60,19 +65,19 @@ public final class Utils
             Log.e(LOG_TAG, "Problem making the HTTP request.", e);
         }
 
-        // Extract relevant fields from the JSON response and create a list of {@link Earthquake}s
-        List<Movie> movies = extractMoviesFromJson(jsonResponse);
+        // Extract relevant fields from the JSON response and create a list of movies
+        List<ContentValues> moviesCv = extractMoviesFromJson(jsonResponse);
 
-        // Return the list of {@link Earthquake}s
-        return movies;
+        // Return the list
+        return moviesCv;
     }
 
 
 
     /**
-     * Return a list of MOVIE objects that has been built up from parsing the given JSON response.
+     * Return a list of CV that has been built up from parsing the given JSON response.
      */
-    private static List<Movie> extractMoviesFromJson(String movieJSON)
+    private static List<ContentValues> extractMoviesFromJson(String movieJSON)
     {
         // If the JSON string is empty or null, then return early.
         if (TextUtils.isEmpty(movieJSON))
@@ -81,7 +86,8 @@ public final class Utils
         }
 
         // Create an empty ArrayList that we can start adding movies to
-        List<Movie> movies = new ArrayList<>();
+        List<ContentValues> movies = new ArrayList<>();
+        ContentValues movieCv;
 
         // Try to parse the JSON response string. If there's a problem with the way the JSON
         // is formatted, a JSONException exception object will be thrown.
@@ -98,22 +104,23 @@ public final class Utils
             // For each movie in the movie array, create a Movie object
             for (int i = 0; i < movieArray.length(); i++)
             {
+                movieCv = new ContentValues();
                 // Get a single movie at position i within the list of earthquakes
                 JSONObject currentMovie = movieArray.getJSONObject(i);
 
                 // Create a new Movie object with the magnitude, location, time,
                 // and url from the JSON response.
-                Movie movie = new Movie(
-                        currentMovie.getInt("id"),
-                        currentMovie.getString("original_title"),
-                        currentMovie.getString("overview"),
-                        currentMovie.getString("release_date"),
-                        currentMovie.getDouble("vote_average"),
-                        currentMovie.getDouble("popularity"),
-                        currentMovie.getString("poster_path")
-                );
+                movieCv.put(MovieEntry.COLUMN_ID, currentMovie.getInt("id"));
+                movieCv.put(MovieEntry.COLUMN_TITLE, currentMovie.getString("original_title"));
+                movieCv.put(MovieEntry.COLUMN_OVERVIEW, currentMovie.getString("overview"));
+                movieCv.put(MovieEntry.COLUMN_DATE, currentMovie.getString("release_date"));
+                movieCv.put(MovieEntry.COLUMN_RATING, currentMovie.getDouble("vote_average"));
+                movieCv.put(MovieEntry.COLUMN_POSTER, currentMovie.getString("poster_path"));
+                movieCv.put(MovieEntry.COLUMN_FAV, 0);
+                movieCv.put(MovieEntry.COLUMN_TYPE, sMovieType);
+
                 // Add the new Movie to the list of movies
-                movies.add(movie);
+                movies.add(movieCv);
             }
         }
         catch (JSONException e)
@@ -123,10 +130,9 @@ public final class Utils
             // with the message from the exception.
             Log.e(LOG_TAG, "Problem parsing the movies JSON results", e);
         }
-        // Return the list of movies
+        // Return the list
         return movies;
     }
-
 
 
     /**
@@ -246,7 +252,7 @@ public final class Utils
     /** Displays colorful snackbar messages */
     public static void showSnackbar (Context context, View view, String message)
     {
-        Snackbar snack = Snackbar.make(view, message, Snackbar.LENGTH_SHORT);
+        Snackbar snack = Snackbar.make(view, message, Snackbar.LENGTH_LONG);
         View sbview = snack.getView();
         sbview.setBackgroundColor(ContextCompat.getColor(context, R.color.colorPrimary));
         TextView textView =
@@ -257,7 +263,7 @@ public final class Utils
 
 
     /** Helper method to build the poster URL */
-    public static String buildPosterUrl(int position, int caller)
+    public static String buildPosterUrl(Cursor cursor, int caller)
     {
         // start building the URL
         Uri baseUri = Uri.parse(BASE_POSTER_URL);
@@ -271,9 +277,35 @@ public final class Utils
                 uriBuilder.appendEncodedPath(SIZE342);
                 break;
         }
-        uriBuilder.appendEncodedPath(master_list.get(position).getmPosterPath());
+        uriBuilder.appendEncodedPath(cursor.getString(
+                    cursor.getColumnIndex(MovieEntry.COLUMN_POSTER)));
 
         return uriBuilder.toString();
+    }
+
+
+    public static boolean movieInDatabase(int movieIndex, Context context)
+    {
+        String[] projection = new String[]
+        {
+            MovieEntry._ID,
+            MovieEntry.COLUMN_ID
+        };
+        String selection =  MovieEntry.COLUMN_ID + "=?";
+        String [] selectionArgs = new String[] { String.valueOf(movieIndex) };
+
+        Cursor cursor = context.getContentResolver()
+                .query(MovieEntry.CONTENT_URI, projection, selection, selectionArgs, null);
+
+        if (cursor == null || cursor.getCount() < 1)
+        {
+            return false;
+        }
+        else
+        {
+            cursor.close();
+            return true;
+        }
     }
 
 

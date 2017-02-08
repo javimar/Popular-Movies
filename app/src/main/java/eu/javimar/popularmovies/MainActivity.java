@@ -1,10 +1,14 @@
 package eu.javimar.popularmovies;
 
 import android.app.LoaderManager;
+import android.content.ContentUris;
+import android.content.CursorLoader;
 import android.content.Intent;
 import android.content.Loader;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -13,24 +17,26 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import eu.javimar.popularmovies.model.Movie;
+import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
+import eu.javimar.popularmovies.model.MovieDbHelper;
 import eu.javimar.popularmovies.model.MovieLoader;
 import eu.javimar.popularmovies.view.MovieAdapter;
 
+import static eu.javimar.popularmovies.model.MovieContract.MovieEntry.TABLE_NAME;
+
 @SuppressWarnings("all")
 public class MainActivity extends AppCompatActivity implements
-        LoaderManager.LoaderCallbacks<List<Movie>>,
+        LoaderManager.LoaderCallbacks<Cursor>,
         SharedPreferences.OnSharedPreferenceChangeListener,
         MovieAdapter.ListItemClickListener
 {
@@ -44,25 +50,25 @@ public class MainActivity extends AppCompatActivity implements
 
     private MovieAdapter mMovieAdapter;
 
-    private static final int MOVIE_LOADER_ID = 0;
-
-    /**
-     * To check if we are connected to the Internet
-     */
-    boolean hasConnectivity = false;
-
-    /**
-     * The Master List of MOVIES where everything revolves around
-     */
-    public static List<Movie> master_list = new ArrayList<>();
+    /** LOADER CONSTANTS */
+    private static final int MOVIE_SERVER_LOADER = 90;
+    private static final int MOVIE_DB_LOADER = 91;
 
     /**
      * URL bits and pieces for the themoviedb.org
      */
     private static final String BASE_URL = "http://api.themoviedb.org/3";
-    private static final String TOP_RATED = "movie/top_rated";
-    private static final String POPULAR = "movie/popular";
+    private static final String TOP_RATED_PATH = "movie/top_rated";
+    private static final String POPULAR_PATH = "movie/popular";
     private static final String API_KEY_TAG = "api_key";
+
+    /** Strings for the column COLUMN_TYPE */
+    private static final String POPULAR = "popular";
+    private static final String TOP_RATED = "toprated";
+    private static final String FAVORITE = "favorites";
+
+    /** Store the value of the preference */
+    private static String sMovieType;
 
 
     @Override
@@ -77,6 +83,7 @@ public class MainActivity extends AppCompatActivity implements
         setSupportActionBar(toolbar);
         getSupportActionBar().setTitle(R.string.app_name);
         collapsingToolbarLayout.setTitleEnabled(false);
+
 
         // add support for preferences changes callback
         PreferenceManager
@@ -100,26 +107,34 @@ public class MainActivity extends AppCompatActivity implements
         // Setting the adapter attaches it to the RecyclerView in our layout
         mRecyclerView.setAdapter(mMovieAdapter);
 
-        // start loader
-        startServerLoader();
+        // store preference display filter
+        sMovieType = getPreferenceOrderBy();
+        Bundle bundle = new Bundle();
+        bundle.putString("movie_type", sMovieType);
+
+        // start server loader
+        startServerLoader(bundle);
+
+        // show movies in the screen
+        getLoaderManager().initLoader(MOVIE_DB_LOADER, bundle, this);
     }
 
 
-    private void startServerLoader()
+    private void startServerLoader(Bundle bundle)
     {
-        // If there is a network connection, fetch data
+        // show progress bar
+        mLoadingIndicator.setVisibility(View.VISIBLE);
+
+        // If there is a network connection, fetch data for toprated or popular
         if (Utils.isNetworkAvailable(this))
         {
-            hasConnectivity = true;
-            mLoadingIndicator.setVisibility(View.VISIBLE);
-            getLoaderManager().initLoader(MOVIE_LOADER_ID, null, this);
+            getLoaderManager().initLoader(MOVIE_SERVER_LOADER, bundle, this);
         }
         else
         {
-            // not connected, show error
+            // not connected, show message
             Utils.showSnackbar(this, mRecyclerView,
                     getString(R.string.error_no_internet_connection));
-            hasConnectivity = false;
             // First, hide loading indicator so error message will be visible
             mLoadingIndicator.setVisibility(View.GONE);
             // Update empty state with no connection message
@@ -127,68 +142,223 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        // update subtitle on screen rotation
-        if (getPreferenceOrderBy().equals(getString(R.string.settings_order_by_popular_value)))
-        {
-            getSupportActionBar().setSubtitle(R.string.settings_order_by_popular_label);
-        }
-        else
-        {
-            getSupportActionBar().setSubtitle(R.string.settings_order_by_top_rated_label);
-        }
-    }
 
     /**
      * LOADER METHODS
      */
     @Override
-    public Loader<List<Movie>> onCreateLoader(int id, Bundle args)
+    public Loader<Cursor> onCreateLoader(int id, Bundle args)
     {
-        // start building the URL
-        Uri baseUri = Uri.parse(BASE_URL);
-        Uri.Builder uriBuilder = baseUri.buildUpon();
+        String movieType;
 
-        if (getPreferenceOrderBy().equals(getString(R.string.settings_order_by_popular_value)))
+        switch (id)
+        {
+            case MOVIE_SERVER_LOADER:
+                // get which type of movie
+                movieType = args.getString("movie_type");
+
+                // start building the URL
+                Uri baseUri = Uri.parse(BASE_URL);
+                Uri.Builder uriBuilder = baseUri.buildUpon();
+
+                if (movieType.equals(getString(R.string.settings_order_by_popular_value)))
+                {
+                    uriBuilder.appendEncodedPath(POPULAR_PATH);
+                }
+                else
+                {
+                    uriBuilder.appendEncodedPath(TOP_RATED_PATH);
+                }
+                // add the API_KEY to the query ?q=
+                uriBuilder.appendQueryParameter(API_KEY_TAG, getString(R.string.API_KEY));
+                return new MovieLoader(this, uriBuilder.toString(), movieType);
+
+            case MOVIE_DB_LOADER:
+                // get which type of movie
+                movieType = args.getString("movie_type");
+
+                if (movieType.equals(getString(R.string.settings_order_by_popular_value)))
+                {
+                    getSupportActionBar().setSubtitle(R.string.settings_order_by_popular_label);
+                }
+                else if (movieType.equals(getString(R.string.settings_order_by_top_rated_value)))
+                {
+                    getSupportActionBar().setSubtitle(R.string.settings_order_by_top_rated_label);
+                }
+                else if (movieType.equals(getString(R.string.settings_order_by_fav_value)))
+                {
+                    getSupportActionBar().setSubtitle(R.string.settings_order_by_fav_label);
+                    String [] projection = new String[]
+                    {
+                        MovieEntry._ID,
+                        MovieEntry.COLUMN_POSTER
+                    };
+                    String selection = MovieEntry.COLUMN_FAV + "=?";
+                    String [] selectionArgs = new String[] { String.valueOf(1) };
+                    return new CursorLoader(
+                        this,
+                        MovieEntry.CONTENT_URI,
+                        projection,
+                        selection,
+                        selectionArgs,
+                        null);
+                }
+
+                // only valid for top_rated or popular
+                String [] projection = new String[]
+                {
+                    MovieEntry._ID,
+                    MovieEntry.COLUMN_POSTER
+                };
+                String selection = MovieEntry.COLUMN_TYPE + "=?";
+                String [] selectionArgs = new String[] { movieType };
+                return new CursorLoader(
+                    this,
+                    MovieEntry.CONTENT_URI,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    null);
+        }
+        return null;
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor)
+    {
+        int id = loader.getId();
+
+        // Hide loading indicator
+        mLoadingIndicator.setVisibility(View.GONE);
+
+        switch (id)
+        {
+            case MOVIE_SERVER_LOADER:
+                if ((cursor == null || cursor.getCount() < 1))
+                {
+                    // error retrieving movies from server
+                    mErrorMessageDisplay.setText(R.string.error_retrieving_movies);
+                }
+                break;
+            case MOVIE_DB_LOADER:
+                if (cursor == null || cursor.getCount() < 1)
+                {
+                    if (sMovieType.equals(FAVORITE))
+                    {
+                        // update empty state with no favorites stored
+                        mErrorMessageDisplay.setText(R.string.error_no_favorites);
+                    }
+                }
+                else
+                {
+                    mErrorMessageDisplay.setText("");
+                }
+                // Update CursorAdapter with new cursor containing updated movie data
+                mMovieAdapter.swapCursor(cursor);
+                mRecyclerView.invalidate();
+                break;
+        }
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader)
+    {
+        int id = loader.getId();
+        // Loader reset, so we can clear out our existing data.
+        switch (id)
+        {
+            case MOVIE_DB_LOADER:
+                mMovieAdapter.swapCursor(null);
+                break;
+        }
+    }
+
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences pref, String key)
+    {
+        if (key.equals(getString(R.string.settings_order_by_key))) // ORDER_BY, for this app it's always true
+        {
+            sMovieType = getPreferenceOrderBy();
+            Bundle bundle = new Bundle();
+            bundle.putString("movie_type", sMovieType);
+
+            if (getPreferenceOrderBy().equals(getString(R.string.settings_order_by_fav_value)))
+            {
+                getLoaderManager().restartLoader(MOVIE_DB_LOADER, bundle, this);
+                // favorite => don't do network request
+                return;
+            }
+
+            if (Utils.isNetworkAvailable(this))
+            {
+                // only valid for top_rated or popular, refresh and display again
+                getLoaderManager().restartLoader(MOVIE_SERVER_LOADER, bundle, this);
+                getLoaderManager().restartLoader(MOVIE_DB_LOADER, bundle, this);
+            }
+            else
+            {
+                getLoaderManager().restartLoader(MOVIE_DB_LOADER, bundle, this);
+                // not connected, show message
+                mErrorMessageDisplay.setText(R.string.error_no_internet_connection);
+                Utils.showSnackbar(this, mRecyclerView,
+                        getString(R.string.error_no_internet_connection));
+            }
+        }
+    }
+
+
+
+    @Override
+    protected void onStart()
+    {
+        super.onStart();
+        // update subtitle on screen rotation
+        sMovieType = getPreferenceOrderBy();
+
+        if (sMovieType.equals(getString(R.string.settings_order_by_popular_value)))
         {
             getSupportActionBar().setSubtitle(R.string.settings_order_by_popular_label);
-            uriBuilder.appendEncodedPath(POPULAR);
         }
-        else
+        else if (sMovieType.equals(getString(R.string.settings_order_by_top_rated_value)))
         {
             getSupportActionBar().setSubtitle(R.string.settings_order_by_top_rated_label);
-            uriBuilder.appendEncodedPath(TOP_RATED);
         }
-        // add the API_KEY to the query
-        uriBuilder.appendQueryParameter(API_KEY_TAG, getString(R.string.API_KEY));
-
-        return new MovieLoader(this, uriBuilder.toString());
-    }
-
-    @Override
-    public void onLoadFinished(Loader<List<Movie>> loader, List<Movie> movies)
-    {
-        // If there is a valid list of movies, then add them to the adapter's data set.
-        if (movies != null && !movies.isEmpty())
+        else if (sMovieType.equals(getString(R.string.settings_order_by_fav_value)))
         {
-            // Hide loading indicator because the data has been loaded OK
-            mLoadingIndicator.setVisibility(View.GONE);
-            // swap old data with new data
-            mMovieAdapter.swap(movies);
+            getSupportActionBar().setSubtitle(R.string.settings_order_by_fav_label);
         }
+
+        getMovieCount();
     }
+
 
     @Override
-    public void onLoaderReset(Loader<List<Movie>> loader) {
-        // Clear out our old data
+    protected void onDestroy()
+    {
+        super.onDestroy();
+        // Unregister MainActivity as an OnPreferenceChangedListener to avoid any memory leaks.
+        PreferenceManager.getDefaultSharedPreferences(this)
+                .unregisterOnSharedPreferenceChangeListener(this);
     }
 
 
+    /** PARA BORRAR SOLO DEBUG */
+    public void getMovieCount()
+    {
+        String countQuery = "SELECT  * FROM " + TABLE_NAME;
+        SQLiteDatabase db = new MovieDbHelper(this).getReadableDatabase();
+        Cursor cursor = db.rawQuery(countQuery, null);
+        Log.d (LOG_TAG, "JAVIER NUM ELEMENTOS= " + cursor.getCount());
+        cursor.close();
+    }
+
+
+    /**
+     * Check shared preferences and return the value of the selected preference
+     */
     private String getPreferenceOrderBy()
     {
-        // Check shared preferences and return the value of the selected preference
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         return sharedPrefs.getString(
                 getString(R.string.settings_order_by_key),
@@ -197,13 +367,17 @@ public class MainActivity extends AppCompatActivity implements
 
 
     /**
-     * Gives me the exact movie being clicked so that I can display its detail
+     * Gives the exact movie being clicked so that I can display its detail
      */
     @Override
     public void onListItemClick(int clickedItemIndex)
     {
         Intent i = new Intent(this, DetailActivity.class);
-        i.putExtra("index", clickedItemIndex);
+        // Form the content URI that represents the specific movie that was clicked on,
+        // by appending the "id" (passed as input to this method) onto the
+        // FallaEntry#CONTENT_URI}.
+        Uri moviesUri = ContentUris.withAppendedId(MovieEntry.CONTENT_URI, clickedItemIndex);
+        i.setData(moviesUri);
         startActivity(i);
     }
 
@@ -223,23 +397,14 @@ public class MainActivity extends AppCompatActivity implements
     {
         int id = item.getItemId();
         Intent i;
-        switch (id) {
+        switch (id)
+        {
             case R.id.action_settings:
                 i = new Intent(this, SettingsActivity.class);
                 startActivity(i);
                 return true;
         }
         return super.onOptionsItemSelected(item);
-    }
-
-
-    @Override
-    public void onSharedPreferenceChanged(SharedPreferences pref, String key)
-    {
-        if (key.equals(getString(R.string.settings_order_by_key))) // ORDER_BY
-        {
-            getLoaderManager().restartLoader(MOVIE_LOADER_ID, null, this);
-        }
     }
 
 

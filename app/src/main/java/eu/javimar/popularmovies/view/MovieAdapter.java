@@ -1,6 +1,7 @@
 package eu.javimar.popularmovies.view;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,15 +10,11 @@ import android.widget.ImageView;
 
 import com.squareup.picasso.Picasso;
 
-import java.util.List;
-
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import eu.javimar.popularmovies.R;
 import eu.javimar.popularmovies.Utils;
-import eu.javimar.popularmovies.model.Movie;
-
-import static eu.javimar.popularmovies.MainActivity.master_list;
+import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
 
 
 @SuppressWarnings("all")
@@ -26,6 +23,7 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
     private static final String LOG_TAG = MovieAdapter.class.getSimpleName();
 
     private Context mContext;
+    private Cursor mCursor;
 
     /**
      * An on-click handler to make it easy for an Activity to interface with our RecyclerView
@@ -70,9 +68,13 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
     @Override
     public void onBindViewHolder(MovieViewHolder holder, int position)
     {
+        if (!mCursor.moveToPosition(position))
+            return; // bail if returned null
+        mCursor.moveToPosition(position);
+
         Picasso
                 .with(mContext)
-                .load(Utils.buildPosterUrl(position, Utils.MOVIE_ADAPTER))
+                .load(Utils.buildPosterUrl(mCursor, Utils.MOVIE_ADAPTER))
                 .placeholder(R.drawable.placeholder)
                 .error(R.drawable.error_image)
                 .into(holder.mImageView);
@@ -80,16 +82,19 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
 
     @Override
     public int getItemCount() {
-        return master_list.size();
+        if (mCursor != null)
+            return mCursor.getCount();
+        return 0;
     }
 
-    public void swap(List<Movie> data)
+    public void swapCursor(Cursor newCursor)
     {
-        master_list.clear();
-        master_list.addAll(data);
-        notifyDataSetChanged();
+        if (newCursor != null)
+        {
+            mCursor = newCursor;
+            notifyDataSetChanged();
+        }
     }
-
 
     /**
      * Cache of the children views for a movie list item.
@@ -107,8 +112,31 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
         }
 
         @Override
-        public void onClick(View v) {
-            mOnClickListener.onListItemClick(getAdapterPosition());
+        public void onClick(View v)
+        {
+            mOnClickListener.onListItemClick(getIdMovie(getAdapterPosition()));
         }
     }
+
+    /** Returns value of column from current position */
+    private int getIdMovie(int position)
+    {
+        if (mCursor != null) {
+            if (mCursor.moveToPosition(position)) {
+                return mCursor.getInt(mCursor.getColumnIndex(MovieEntry._ID));
+            }
+            else {
+                return -1;
+            }
+        }
+        else {
+            return -1;
+        }
+    }
+
+    public Cursor getCursor()
+    {
+        return mCursor;
+    }
+
 }
