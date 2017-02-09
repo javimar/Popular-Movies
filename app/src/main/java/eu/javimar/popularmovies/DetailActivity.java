@@ -1,10 +1,12 @@
 package eu.javimar.popularmovies;
 
 import android.app.LoaderManager;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.CursorLoader;
 import android.content.Loader;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.CollapsingToolbarLayout;
@@ -12,16 +14,21 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.squareup.picasso.Picasso;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import eu.javimar.popularmovies.model.MovieContract;
 import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
+import eu.javimar.popularmovies.model.MovieContract.TrailerEntry;
+import eu.javimar.popularmovies.model.MovieContract.ReviewEntry;
 
 
 public class DetailActivity extends AppCompatActivity
@@ -38,6 +45,9 @@ public class DetailActivity extends AppCompatActivity
     @BindView(R.id.toolbar) Toolbar toolbar;
     @BindView(R.id.collapse_toolbar) CollapsingToolbarLayout collapsingToolbarLayout;
     @BindView(R.id.imgToolbarParallax) ImageView mImgToolbarParallax;
+    @BindView(R.id.movieTrailerContainer) LinearLayout mMovieTrailerContainer;
+    TextView mTvTrailer;
+
 
     String mMovieTitle = "";
     int mMovieId = 0;
@@ -48,10 +58,9 @@ public class DetailActivity extends AppCompatActivity
 
     /** youtube URL */
     private static final String YOUTUBE_URL = "https://youtu.be";
-    //http://api.themoviedb.org/3/movie/ID/videos?api_key=API_KEY
-    //http://api.themoviedb.org/3/movie/ID/reviews?api_key=API_KEY
+    //https://youtu.be/key to visualize
 
-    /** Identifier for the movie detail loader */
+    /** Identifier for the loaders */
     private static final int MOVIE_DETAIL_LOADER = 0;
 
 
@@ -75,10 +84,8 @@ public class DetailActivity extends AppCompatActivity
 
         if (mCurrentMovieUri != null)
         {
-            // Initialize a loader to read the movie data from the database
-            // and display the current values, since we kill the activity
-            // everytime we update, loader data is always initialize
-            getLoaderManager().initLoader(MOVIE_DETAIL_LOADER, null, this);
+            // Initialize loader to read the movie data from the database
+            getLoaderManager().restartLoader(MOVIE_DETAIL_LOADER, null, this);
         }
     }
 
@@ -87,26 +94,35 @@ public class DetailActivity extends AppCompatActivity
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args)
     {
-        // Include all attributes in projection that we need from the movie table
+        // add the path to recognize the JOIN of movies and trailers
+        Uri.Builder ub = mCurrentMovieUri.buildUpon();
+        ub.appendPath(MovieContract.PATH_MOVIE_TRAILER);
+
         String[] projection =
-        {
-            MovieEntry._ID,
-            MovieEntry.COLUMN_ID,
-            MovieEntry.COLUMN_TITLE,
-            MovieEntry.COLUMN_OVERVIEW,
-            MovieEntry.COLUMN_POSTER,
-            MovieEntry.COLUMN_RATING,
-            MovieEntry.COLUMN_DATE
-        };
-        // This loader will execute the ContentProvider's query method on a background thread
+                {
+                    MovieEntry.TABLE_NAME + "." + MovieEntry._ID,
+                    MovieEntry.COLUMN_ID,
+                    MovieEntry.COLUMN_TITLE,
+                    MovieEntry.COLUMN_OVERVIEW,
+                    MovieEntry.COLUMN_POSTER,
+                    MovieEntry.COLUMN_RATING,
+                    MovieEntry.COLUMN_DATE,
+                    TrailerEntry.TABLE_NAME + "." + TrailerEntry._ID,
+                    TrailerEntry.TABLE_NAME + "." + TrailerEntry.COLUMN_MOVIE_ID,
+                    TrailerEntry.COLUMN_NAME,
+                    TrailerEntry.COLUMN_KEY
+                };
+        String selection = MovieEntry.TABLE_NAME + "." + MovieEntry._ID + "=?";
+        String[] selectionArgs = new String[] { String.valueOf(ContentUris.parseId(mCurrentMovieUri)) };
         return new CursorLoader(
-                this,                   // Parent activity context
-                mCurrentMovieUri,       // Query the content URI for the current movie
-                projection,             // Columns to include in the resulting Cursor
-                null,                   // No selection clause
-                null,                   // No selection arguments
+                this,
+                ub.build(),
+                projection,
+                selection,
+                selectionArgs,
                 null);
     }
+
 
     @Override
     public void onLoadFinished(Loader<Cursor> loader, final Cursor cursor)
@@ -116,8 +132,8 @@ public class DetailActivity extends AppCompatActivity
         {
             return;
         }
+
         // Proceed with moving to the first row of the cursor and reading data from it
-        // (This should be the only row in the cursor)
         if (cursor.moveToFirst())
         {
             // Find the columns of movie attributes that we're interested in
@@ -152,7 +168,7 @@ public class DetailActivity extends AppCompatActivity
                     .into(mImgToolbarParallax);
         }
 
-        // This is a good spot to take care of member variables a fab button
+        // This is a good spot to take care of member variables
         // make subtitle in toolbar equal to movie title
         getSupportActionBar().setSubtitle(mMovieTitle);
 
@@ -180,7 +196,36 @@ public class DetailActivity extends AppCompatActivity
                 updateMovieFavorite();
             }
         });
+
+
+        /**
+         * Time for the TRAILERS
+         */
+        Log.d(LOG_TAG, "JAVIER JOIN CURSOR= " + DatabaseUtils.dumpCursorToString(cursor));
+        // Go back to first element, traverse the trailers, and create views programmatically
+        cursor.moveToFirst();
+        while (cursor.moveToNext())
+        {
+            String name = cursor.getString(cursor.getColumnIndex(TrailerEntry.COLUMN_NAME));
+            String trailer_key = cursor.getString(cursor.getColumnIndex(TrailerEntry.COLUMN_KEY));
+
+            View mMovieTrailerItem = LayoutInflater.from(this).inflate(
+                    R.layout.movie_trailer_item, null);
+
+            mMovieTrailerItem.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    // will do something later
+                }
+            });
+            mTvTrailer = (TextView)mMovieTrailerItem.findViewById(R.id.tv_trailer);
+            mTvTrailer.setText(name);
+            mMovieTrailerContainer.addView(mMovieTrailerItem);
+        }
+
     }
+
+
 
     @Override
     public void onLoaderReset(Loader<Cursor> loader) {
@@ -188,7 +233,7 @@ public class DetailActivity extends AppCompatActivity
     }
 
 
-
+    /** Fake favorite delete */
     private void updateMovieFavorite()
     {
         ContentValues values = new ContentValues();
@@ -200,7 +245,6 @@ public class DetailActivity extends AppCompatActivity
             // Pass in null for the selection and selection args because mCurrentMovieUri
             // will already identify the correct row in the database that we want to modify.
             int rowsAffected = getContentResolver().update(mCurrentMovieUri, values, null, null);
-
             if (rowsAffected != 0)
             {
                 // update was successful
@@ -218,8 +262,6 @@ public class DetailActivity extends AppCompatActivity
                 // update was successful,
                 Utils.showSnackbar(DetailActivity.this, toolbar,
                         String.format(getString(R.string.detail_movie_delete), mMovieTitle));
-
-                //finish();
             }
             else
             {

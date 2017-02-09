@@ -1,5 +1,4 @@
 package eu.javimar.popularmovies;
-
 import android.app.LoaderManager;
 import android.content.ContentUris;
 import android.content.CursorLoader;
@@ -8,7 +7,6 @@ import android.content.Loader;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -26,15 +24,16 @@ import android.widget.TextView;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
-import eu.javimar.popularmovies.model.Movie;
 import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
-import eu.javimar.popularmovies.model.MovieDbHelper;
 import eu.javimar.popularmovies.model.MovieLoader;
 import eu.javimar.popularmovies.view.MovieAdapter;
 
-import static eu.javimar.popularmovies.model.MovieContract.MovieEntry.TABLE_NAME;
-
+import static eu.javimar.popularmovies.Utils.API_KEY_TAG;
+import static eu.javimar.popularmovies.Utils.BASE_URL;
+import static eu.javimar.popularmovies.Utils.sMovieType;
 @SuppressWarnings("all")
+
+
 public class MainActivity extends AppCompatActivity implements
         LoaderManager.LoaderCallbacks<Cursor>,
         SharedPreferences.OnSharedPreferenceChangeListener,
@@ -57,18 +56,14 @@ public class MainActivity extends AppCompatActivity implements
     /**
      * URL bits and pieces for the themoviedb.org
      */
-    private static final String BASE_URL = "http://api.themoviedb.org/3";
     private static final String TOP_RATED_PATH = "movie/top_rated";
     private static final String POPULAR_PATH = "movie/popular";
-    private static final String API_KEY_TAG = "api_key";
 
     /** Strings for the column COLUMN_TYPE */
     private static final String POPULAR = "popular";
     private static final String TOP_RATED = "toprated";
     private static final String FAVORITE = "favorites";
 
-    /** Store the value of the preference */
-    private static String sMovieType;
 
 
     @Override
@@ -123,7 +118,7 @@ public class MainActivity extends AppCompatActivity implements
     private void startServerLoader(Bundle bundle)
     {
         // show progress bar
-        mLoadingIndicator.setVisibility(View.VISIBLE);
+        setLoadingIndicatorVisible(true);
 
         // If there is a network connection, fetch data for toprated or popular
         if (Utils.isNetworkAvailable(this))
@@ -136,7 +131,7 @@ public class MainActivity extends AppCompatActivity implements
             Utils.showSnackbar(this, mRecyclerView,
                     getString(R.string.error_no_internet_connection));
             // First, hide loading indicator so error message will be visible
-            mLoadingIndicator.setVisibility(View.GONE);
+            setLoadingIndicatorVisible(false);
             // Update empty state with no connection message
             mErrorMessageDisplay.setText(R.string.error_no_internet_connection);
         }
@@ -171,7 +166,7 @@ public class MainActivity extends AppCompatActivity implements
                 }
                 // add the API_KEY to the query ?q=
                 uriBuilder.appendQueryParameter(API_KEY_TAG, getString(R.string.API_KEY));
-                return new MovieLoader(this, uriBuilder.toString(), movieType);
+                return new MovieLoader(this, uriBuilder.toString());
 
             case MOVIE_DB_LOADER:
                 // get which type of movie
@@ -227,9 +222,7 @@ public class MainActivity extends AppCompatActivity implements
     public void onLoadFinished(Loader<Cursor> loader, Cursor cursor)
     {
         int id = loader.getId();
-
-        // Hide loading indicator
-        mLoadingIndicator.setVisibility(View.GONE);
+        setLoadingIndicatorVisible(false);
 
         switch (id)
         {
@@ -300,6 +293,7 @@ public class MainActivity extends AppCompatActivity implements
             {
                 getLoaderManager().restartLoader(MOVIE_DB_LOADER, bundle, this);
                 // not connected, show message
+                setLoadingIndicatorVisible(false);
                 mErrorMessageDisplay.setText(R.string.error_no_internet_connection);
                 Utils.showSnackbar(this, mRecyclerView,
                         getString(R.string.error_no_internet_connection));
@@ -307,6 +301,21 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
+
+    private void setLoadingIndicatorVisible(boolean set)
+    {
+        if (set)
+        {
+            mLoadingIndicator.setVisibility(View.VISIBLE);
+            mErrorMessageDisplay.setVisibility(View.GONE);
+        }
+        else
+        {
+            mLoadingIndicator.setVisibility(View.GONE);
+            mErrorMessageDisplay.setVisibility(View.VISIBLE);
+        }
+
+    }
 
 
     @Override
@@ -328,8 +337,6 @@ public class MainActivity extends AppCompatActivity implements
         {
             getSupportActionBar().setSubtitle(R.string.settings_order_by_fav_label);
         }
-
-        getMovieCount();
     }
 
 
@@ -340,17 +347,6 @@ public class MainActivity extends AppCompatActivity implements
         // Unregister MainActivity as an OnPreferenceChangedListener to avoid any memory leaks.
         PreferenceManager.getDefaultSharedPreferences(this)
                 .unregisterOnSharedPreferenceChangeListener(this);
-    }
-
-
-    /** PARA BORRAR SOLO DEBUG */
-    public void getMovieCount()
-    {
-        String countQuery = "SELECT  * FROM " + TABLE_NAME;
-        SQLiteDatabase db = new MovieDbHelper(this).getReadableDatabase();
-        Cursor cursor = db.rawQuery(countQuery, null);
-        Log.d (LOG_TAG, "JAVIER NUM ELEMENTOS= " + cursor.getCount());
-        cursor.close();
     }
 
 
@@ -406,6 +402,7 @@ public class MainActivity extends AppCompatActivity implements
         }
         return super.onOptionsItemSelected(item);
     }
+
 
 
 }// END OF MAIN
