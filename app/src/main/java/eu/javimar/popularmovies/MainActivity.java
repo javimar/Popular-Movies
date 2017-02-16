@@ -9,6 +9,7 @@ import android.content.res.Configuration;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.preference.PreferenceManager;
 import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.v7.app.AppCompatActivity;
@@ -31,9 +32,9 @@ import eu.javimar.popularmovies.view.MovieAdapter;
 import static eu.javimar.popularmovies.Utils.API_KEY_TAG;
 import static eu.javimar.popularmovies.Utils.BASE_URL;
 import static eu.javimar.popularmovies.Utils.sMovieType;
+
+
 @SuppressWarnings("all")
-
-
 public class MainActivity extends AppCompatActivity implements
         LoaderManager.LoaderCallbacks<Cursor>,
         SharedPreferences.OnSharedPreferenceChangeListener,
@@ -48,6 +49,8 @@ public class MainActivity extends AppCompatActivity implements
     @BindView(R.id.pb_loading_indicator) ProgressBar mLoadingIndicator;
 
     private MovieAdapter mMovieAdapter;
+
+    private final String KEY_RECYCLER_STATE = "recycler_state";
 
     /** LOADER CONSTANTS */
     private static final int MOVIE_SERVER_LOADER = 90;
@@ -185,7 +188,7 @@ public class MainActivity extends AppCompatActivity implements
                     getSupportActionBar().setSubtitle(R.string.settings_order_by_fav_label);
                     String [] projection = new String[]
                     {
-                        MovieEntry._ID,
+                        MovieEntry.MOVIE_POS,
                         MovieEntry.COLUMN_POSTER
                     };
                     String selection = MovieEntry.COLUMN_FAV + "=?";
@@ -202,7 +205,7 @@ public class MainActivity extends AppCompatActivity implements
                 // only valid for top_rated or popular
                 String [] projection = new String[]
                 {
-                    MovieEntry._ID,
+                    MovieEntry.MOVIE_POS,
                     MovieEntry.COLUMN_POSTER
                 };
                 String selection = MovieEntry.COLUMN_TYPE + "=?";
@@ -279,13 +282,14 @@ public class MainActivity extends AppCompatActivity implements
             if (getPreferenceOrderBy().equals(getString(R.string.settings_order_by_fav_value)))
             {
                 getLoaderManager().restartLoader(MOVIE_DB_LOADER, bundle, this);
-                // favorite => don't do network request
+                // favorite => never do network request
                 return;
             }
 
             if (Utils.isNetworkAvailable(this))
             {
                 // only valid for top_rated or popular, refresh and display again
+                Utils.sConnectToApi = true;
                 getLoaderManager().restartLoader(MOVIE_SERVER_LOADER, bundle, this);
                 getLoaderManager().restartLoader(MOVIE_DB_LOADER, bundle, this);
             }
@@ -316,6 +320,29 @@ public class MainActivity extends AppCompatActivity implements
         }
 
     }
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState)
+    {
+        // save RecyclerView state
+        Parcelable listState = mRecyclerView.getLayoutManager().onSaveInstanceState();
+        savedInstanceState.putParcelable(KEY_RECYCLER_STATE, listState);
+        // Always call the superclass so it can save the view hierarchy state
+        super.onSaveInstanceState(savedInstanceState);
+    }
+
+    public void onRestoreInstanceState(Bundle savedInstanceState)
+    {
+        // Always call the superclass so it can restore the view hierarchy
+        super.onRestoreInstanceState(savedInstanceState);
+        // restore RecyclerView state
+        if (savedInstanceState != null)
+        {
+            Parcelable listState = savedInstanceState.getParcelable(KEY_RECYCLER_STATE);
+            mRecyclerView.getLayoutManager().onRestoreInstanceState(listState);
+        }
+    }
+
 
 
     @Override

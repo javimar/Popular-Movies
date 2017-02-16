@@ -11,9 +11,11 @@ public class Movie implements Parcelable
     private String mReleaseDate;
     private double mVoteAverage;
     private String mPosterPath;
+    private int mFavorite;
+    private String mType;
 
     public Movie(int id, String title, String overview, String releaseDate,
-                  double voteAverage, String poster)
+                  double voteAverage, String poster, int favorite, String type)
     {
         this.mId = id;
         this.mPosterPath = poster;
@@ -21,6 +23,8 @@ public class Movie implements Parcelable
         this.mReleaseDate = releaseDate;
         this.mTitle = title;
         this.mVoteAverage = voteAverage;
+        this.mFavorite = favorite;
+        this.mType = type;
     }
 
 
@@ -34,6 +38,8 @@ public class Movie implements Parcelable
         mReleaseDate = in.readString();
         mVoteAverage = in.readDouble();
         mPosterPath = in.readString();
+        mFavorite = in.readInt();
+        mType = in.readString();
     }
 
     // This is where you write the values you want to save to the "Parcel".
@@ -48,6 +54,8 @@ public class Movie implements Parcelable
         dest.writeString(mReleaseDate);
         dest.writeDouble(mVoteAverage);
         dest.writeString(mPosterPath);
+        dest.writeInt(mFavorite);
+        dest.writeString(mType);
     }
 
     // After implementing the "Parcelable" interface, we need to create the
@@ -92,17 +100,10 @@ public class Movie implements Parcelable
     public int getmId() {
         return mId;
     }
-
-    @Override
-    public String toString() {
-        return "Movie{" +
-                "Id=" + mId +
-                ", Title='" + mTitle + '\'' +
-                ", Overview='" + mOverview + '\'' +
-                ", ReleaseDate='" + mReleaseDate + '\'' +
-                ", VoteAverage=" + mVoteAverage +
-                ", PosterPath='" + mPosterPath + '\'' +
-                '}';
+    public int getmFavorite() {
+        return mFavorite;
     }
-
+    public String getmType() {
+        return mType;
+    }
 }

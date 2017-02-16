@@ -123,7 +123,7 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
     {
         if (mCursor != null) {
             if (mCursor.moveToPosition(position)) {
-                return mCursor.getInt(mCursor.getColumnIndex(MovieEntry._ID));
+                return mCursor.getInt(mCursor.getColumnIndex(MovieEntry.MOVIE_POS));
             }
             else {
                 return -1;

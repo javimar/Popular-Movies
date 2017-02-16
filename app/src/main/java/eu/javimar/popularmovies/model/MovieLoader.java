@@ -25,10 +25,15 @@ public class MovieLoader extends AsyncTaskLoader<Cursor>
         mUrl = url;
     }
 
+
     @Override
     protected void onStartLoading()
     {
-        forceLoad();
+        // only connect to the API once per run
+        if(Utils.sConnectToApi)
+            forceLoad();
+
+        Utils.sConnectToApi = false;
     }
 
 
@@ -44,8 +49,6 @@ public class MovieLoader extends AsyncTaskLoader<Cursor>
         String [] selectionArgs = new String[] { String.valueOf(0) };
         int rowsDeleted = mContext.getContentResolver()
                 .delete(MovieEntry.CONTENT_URI, selection, selectionArgs);
-
-        Log.d(LOG_TAG, "JAVIER movies deleted= " + rowsDeleted);
 
         // Perform the network request to store all movie info into the database
         Utils.loadMoviesData(mUrl, mContext);

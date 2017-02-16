@@ -9,7 +9,7 @@ import eu.javimar.popularmovies.model.MovieContract.ReviewEntry;
 
 public class MovieDbHelper extends SQLiteOpenHelper
 {
-    private static final String DATABASE_NAME = "favmovies.db";
+    private static final String DATABASE_NAME = "movies.db";
     private static final int DATABASE_VERSION = 1;
 
     public MovieDbHelper(Context context)
@@ -23,8 +23,8 @@ public class MovieDbHelper extends SQLiteOpenHelper
         String SQL_CREATE_MOVIE_TABLE =
                 "CREATE TABLE "
                         + MovieEntry.TABLE_NAME + " ("
-                        + MovieEntry._ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                        + MovieEntry.COLUMN_ID + " INTEGER NOT NULL UNIQUE, "
+                        + MovieEntry.MOVIE_POS + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        + MovieEntry.COLUMN_ID + " INTEGER NOT NULL, "
                         + MovieEntry.COLUMN_TITLE + " TEXT, "
                         + MovieEntry.COLUMN_RATING + " REAL, "
                         + MovieEntry.COLUMN_OVERVIEW + " TEXT, "
@@ -32,7 +32,6 @@ public class MovieDbHelper extends SQLiteOpenHelper
                         + MovieEntry.COLUMN_POSTER + " TEXT, "
                         + MovieEntry.COLUMN_FAV + " INTEGER, "
                         + MovieEntry.COLUMN_TYPE + " TEXT, "
-
                         // To ensure we don't overwrite fav movies create a UNIQUE constraint
                         // with IGNORE strategy
                         + " UNIQUE (" + MovieEntry.COLUMN_ID + ") "
@@ -41,42 +40,42 @@ public class MovieDbHelper extends SQLiteOpenHelper
         String SQL_CREATE_TRAILER_TABLE =
                 "CREATE TABLE "
                         + TrailerEntry.TABLE_NAME + " ("
-                        + TrailerEntry._ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                        + TrailerEntry.COLUMN_ID + " TEXT NOT NULL , "
+                        + TrailerEntry.TRAILER_POS + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                         + TrailerEntry.COLUMN_NAME + " TEXT, "
-                        // the ID of the movie associated with this video
-                        + TrailerEntry.COLUMN_MOVIE_ID + " INTEGER NOT NULL, "
-                        // the key needed to visualize it in youtube
                         + TrailerEntry.COLUMN_KEY + " TEXT, "
-
-                        + " CONSTRAINT fk_trailer_id "
-                        + " FOREIGN KEY (" + TrailerEntry.COLUMN_MOVIE_ID + ") REFERENCES "
-                        + MovieEntry.TABLE_NAME + " (" + MovieEntry.COLUMN_ID + ")"
+                        + TrailerEntry.MOVIE_POS + " INTEGER, "
+                        + " CONSTRAINT fk_movie_id "
+                        + " FOREIGN KEY (" + TrailerEntry.MOVIE_POS + ") REFERENCES "
+                        + MovieEntry.TABLE_NAME + " (" + MovieEntry.MOVIE_POS + ")"
                         + " ON DELETE CASCADE "
+                       // + "UNIQUE ( "
+                       // + TrailerEntry.MOVIE_POS
+                       // + " ) ON CONFLICT REPLACE "
                         + " );";
 
-
-        // coming soon
         String SQL_CREATE_REVIEW_TABLE =
                 "CREATE TABLE "
                         + ReviewEntry.TABLE_NAME + " ("
-                        + ReviewEntry._ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                        + ReviewEntry.COLUMN_ID + " TEXT NOT NULL, "
+                        + ReviewEntry.REVIEW_POS + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                         + ReviewEntry.COLUMN_AUTHOR + " TEXT, "
                         + ReviewEntry.COLUMN_CONTENT + " TEXT, "
-                        + TrailerEntry.COLUMN_MOVIE_ID + " INTEGER, "
-
-                        // Set up foreign key to movie table.
-                        + " FOREIGN KEY (" + ReviewEntry.COLUMN_MOVIE_ID + ") REFERENCES "
-                        + MovieEntry.TABLE_NAME + " (" + MovieEntry.COLUMN_ID + "));";
+                        + ReviewEntry.MOVIE_POS + " INTEGER, "
+                        + " CONSTRAINT fk_movie_id "
+                        + " FOREIGN KEY (" + ReviewEntry.MOVIE_POS + ") REFERENCES "
+                        + MovieEntry.TABLE_NAME + " (" + MovieEntry.MOVIE_POS + ")"
+                        + " ON DELETE CASCADE "
+                        + " );";
 
         db.execSQL(SQL_CREATE_MOVIE_TABLE);
         db.execSQL(SQL_CREATE_TRAILER_TABLE);
-        //db.execSQL(SQL_CREATE_REVIEW_TABLE);
+        db.execSQL(SQL_CREATE_REVIEW_TABLE);
     }
+
+
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion)
     {
     }
+
 }

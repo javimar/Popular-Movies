@@ -1,4 +1,5 @@
 package eu.javimar.popularmovies;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -27,14 +28,16 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
+import eu.javimar.popularmovies.model.MovieContract;
 import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
 import eu.javimar.popularmovies.model.MovieContract.TrailerEntry;
+import eu.javimar.popularmovies.model.MovieContract.ReviewEntry;
 
 
 @SuppressWarnings("All")
 public final class Utils
 {
-    private static final String LOG_TAG = Utils.class.getName();
+    private static final String LOG_TAG = Utils.class.getSimpleName();
 
     /** URLs */
     public static final String BASE_URL = "http://api.themoviedb.org/3";
@@ -57,11 +60,14 @@ public final class Utils
     public static final int MOVIE_ADAPTER = 60;
     public static final int DETAIL_ACTIVITY = 61;
 
+    /**  Boolean flag used so that AsyncTaskLoader only connects to the API once per run */
+    public static boolean sConnectToApi = true;
+
     /** Store the value of the settings preference. FAV, POPULAR or TOP_RATED */
     public static String sMovieType;
 
-    /** CV lists to bulk insert into the 3 DBs */
-    public static List<ContentValues> sMoviesCv, sTrailersCv, sReviewsCv;
+    /** CV lists to bulk insert into this 2 DBs */
+    public static List<ContentValues> sTrailersCv, sReviewsCv;
 
 
     // Get all movie info asynchronously
@@ -83,26 +89,18 @@ public final class Utils
 
         // 3. Extract relevant fields from the JSON response and create a list of content values
         extractMoviesFromJson(jsonResponse, context);
-        // 4. insert complete list movies in DB
-        int m = context.getContentResolver().bulkInsert(MovieEntry.CONTENT_URI,
-                sMoviesCv.toArray(new ContentValues[sMoviesCv.size()]));
     }
 
 
 
-    /**
-     * Return a list of CV for movies built up from parsing the given JSON response.
-     */
     private static void extractMoviesFromJson(String movieJSON, Context context)
     {
         // If the JSON string is empty or null, return early.
-        if (TextUtils.isEmpty(movieJSON))
-        {
+        if (TextUtils.isEmpty(movieJSON)) {
             return;
         }
         // initialize
         ContentValues movieCv;
-        sMoviesCv = new ArrayList<>();
         int movie_id = 0;
 
         // Try to parse the JSON response string. If there's a problem with the way the JSON
@@ -134,14 +132,21 @@ public final class Utils
                 movieCv.put(MovieEntry.COLUMN_FAV, 0);
                 movieCv.put(MovieEntry.COLUMN_TYPE, sMovieType);
 
-                // Add the new Movie to the list of movies
-                sMoviesCv.add(movieCv);
+                // insert movie in DB
+                Uri movieUri = context.getContentResolver().insert(MovieEntry.CONTENT_URI, movieCv);
+                if (movieUri != null)
+                {
+                    // get position in DB (row id) to pass, and process all movie trailers associated
+                    processTrailers(ContentUris.parseId(movieUri), movie_id, context);
+                    // insert complete list of trailer in DB
+                    int t = context.getContentResolver().bulkInsert(TrailerEntry.CONTENT_URI,
+                            sTrailersCv.toArray(new ContentValues[sTrailersCv.size()]));
 
-                // for every movie added, process all its trailers
-                processTrailers(movie_id, context);
-                // insert complete list of trailer in DB
-                int t = context.getContentResolver().bulkInsert(TrailerEntry.CONTENT_URI,
-                        sTrailersCv.toArray(new ContentValues[sTrailersCv.size()]));
+                    // do the same with its associated reviews
+                    processReviews(ContentUris.parseId(movieUri), movie_id, context);
+                    t = context.getContentResolver().bulkInsert(ReviewEntry.CONTENT_URI,
+                            sReviewsCv.toArray(new ContentValues[sReviewsCv.size()]));
+                }
             }
         }
         catch (JSONException e)
@@ -157,7 +162,7 @@ public final class Utils
     /**
      * Init point to process trailers table
      */
-    private static void processTrailers(int movie_id, Context context)
+    private static void processTrailers(long movie_pos, int movie_id, Context context)
     {
         // Start building: http://api.themoviedb.org/3/movie/ID/videos?api_key=API_KEY
         Uri baseUri = Uri.parse(BASE_URL);
@@ -182,42 +187,26 @@ public final class Utils
             Log.e(LOG_TAG, "Problem making the HTTP request.", e);
         }
 
-        // 3. Extract relevant fields from the JSON response and create a list of content values
-        extractTrailersFromJson(jsonResponse);
-
-        // 4. insert complete list in DB. Static list sTrailersCv is completed
-        // this is done in the caller function after inserting the movies first to avoid
-        // foreign key constraints
-    }
-
-    /**
-     * Return a list of CV for trailers built up from parsing the given JSON response.
-     */
-    private static void extractTrailersFromJson(String trailerJSON)
-    {
+        // 3. Extract relevant fields from the JSON response and insert them into a list of content values
         // If the JSON string is empty or null, return early.
-        if (TextUtils.isEmpty(trailerJSON))
+        if (TextUtils.isEmpty(jsonResponse))
         {
             return;
         }
-        // initialize
         ContentValues trailerCv;
+        sTrailersCv = null;
         sTrailersCv = new ArrayList<>();
-
         try
         {
-            JSONObject baseJsonResponse = new JSONObject(trailerJSON);
+            JSONObject baseJsonResponse = new JSONObject(jsonResponse);
             JSONArray trailerArray = baseJsonResponse.getJSONArray("results");
-
             for (int i = 0; i < trailerArray.length(); i++)
             {
                 trailerCv = new ContentValues();
                 JSONObject currentTrailer = trailerArray.getJSONObject(i);
-                trailerCv.put(TrailerEntry.COLUMN_ID, currentTrailer.getString("id"));
                 trailerCv.put(TrailerEntry.COLUMN_NAME, currentTrailer.getString("name"));
                 trailerCv.put(TrailerEntry.COLUMN_KEY, currentTrailer.getString("key"));
-                trailerCv.put(TrailerEntry.COLUMN_MOVIE_ID, baseJsonResponse.getInt("id"));
-
+                trailerCv.put(TrailerEntry.MOVIE_POS, movie_pos);
                 // Add the new Trailer to the list
                 sTrailersCv.add(trailerCv);
             }
@@ -231,7 +220,66 @@ public final class Utils
 
 
     /**
-     * Simply returns new URL object from the given string URL.
+     * Init point to process reviews table
+     */
+    private static void processReviews(long movie_pos, int movie_id, Context context)
+    {
+        // Start building: http://api.themoviedb.org/3/movie/ID/videos?api_key=API_KEY
+        Uri baseUri = Uri.parse(BASE_URL);
+        Uri.Builder uriBuilder = baseUri.buildUpon();
+        uriBuilder.appendEncodedPath(MOVIE_PATH);
+        uriBuilder.appendEncodedPath(String.valueOf(movie_id));
+        uriBuilder.appendEncodedPath(REVIEWS_PATH);
+        // add the API_KEY to the query ?q=
+        uriBuilder.appendQueryParameter(API_KEY_TAG, context.getString(R.string.API_KEY));
+
+        // 1. Create URL object
+        URL url = createUrl(uriBuilder.toString());
+
+        // 2. Perform HTTP request to the URL and receive a JSON response back
+        String jsonResponse = null;
+        try
+        {
+            jsonResponse = makeHttpRequest(url);
+        }
+        catch (IOException e)
+        {
+            Log.e(LOG_TAG, "Problem making the HTTP request.", e);
+        }
+
+        // 3. Extract relevant fields from the JSON response and insert them into a list of content values
+        // If the JSON string is empty or null, return early.
+        if (TextUtils.isEmpty(jsonResponse))
+        {
+            return;
+        }
+        ContentValues reviewCv;
+        sReviewsCv = null;
+        sReviewsCv = new ArrayList<>();
+        try
+        {
+            JSONObject baseJsonResponse = new JSONObject(jsonResponse);
+            JSONArray trailerArray = baseJsonResponse.getJSONArray("results");
+            for (int i = 0; i < trailerArray.length(); i++)
+            {
+                reviewCv = new ContentValues();
+                JSONObject currentTrailer = trailerArray.getJSONObject(i);
+                reviewCv.put(ReviewEntry.COLUMN_AUTHOR, currentTrailer.getString("author"));
+                reviewCv.put(ReviewEntry.COLUMN_CONTENT, currentTrailer.getString("content"));
+                reviewCv.put(ReviewEntry.MOVIE_POS, movie_pos);
+                // Add the new Trailer to the list
+                sReviewsCv.add(reviewCv);
+            }
+        }
+        catch (JSONException e)
+        {
+            Log.e(LOG_TAG, "Problem parsing the reviews JSON results", e);
+        }
+    }
+
+
+    /**
+     * Returns a new URL object from the given string URL.
      */
     private static URL createUrl(String stringUrl)
     {
@@ -271,7 +319,6 @@ public final class Utils
             urlConnection.setConnectTimeout(15000 /* milliseconds */);
             urlConnection.setRequestMethod("GET");
             urlConnection.connect();
-
             // If the request was successful (response code 200),
             // then read the input stream and parse the response.
             if (urlConnection.getResponseCode() == 200)
@@ -344,7 +391,7 @@ public final class Utils
     }
 
 
-    /** Displays colorful snackbar messages */
+    /** Displays less boring snackbar messages */
     public static void showSnackbar (Context context, View view, String message)
     {
         Snackbar snack = Snackbar.make(view, message, Snackbar.LENGTH_LONG);

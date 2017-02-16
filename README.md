@@ -22,4 +22,7 @@ Stage 1:
 
 Stage 2:
 --------
-TBD
+- Allow users to view and play trailers ( either in the youtube app or a web browser).
+- Allow users to read reviews of a selected movie.
+- Allow users to mark a movie as a favorite in the details view by tapping a button. This is for a local movies collection that to maintain and does not require an API request.
+- Modify the existing sorting criteria for the main view to include an additional pivot to show their favorites collection.

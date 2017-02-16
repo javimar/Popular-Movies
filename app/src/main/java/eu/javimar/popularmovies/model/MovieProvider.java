@@ -5,13 +5,13 @@ import android.content.ContentValues;
 import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.util.Log;
 
 import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
 import eu.javimar.popularmovies.model.MovieContract.TrailerEntry;
+import eu.javimar.popularmovies.model.MovieContract.ReviewEntry;
 
 public class MovieProvider extends ContentProvider
 {
@@ -20,22 +20,7 @@ public class MovieProvider extends ContentProvider
     private static final int MOVIES = 100;
     private static final int MOVIES_ID = 101;
     private static final int TRAILERS = 200;
-    private static final int MOVIE_TRAILER = 300;
-
-    private static final SQLiteQueryBuilder sMovieAndTrailerJoin;
-    static
-    {
-        sMovieAndTrailerJoin = new SQLiteQueryBuilder();
-        sMovieAndTrailerJoin.setTables(
-                    MovieEntry.TABLE_NAME + " INNER JOIN " +
-                    TrailerEntry.TABLE_NAME +
-                    " ON " +
-                    MovieEntry.TABLE_NAME + "." + MovieEntry.COLUMN_ID +
-                    " = " +
-                    TrailerEntry.TABLE_NAME + "." + TrailerEntry.COLUMN_MOVIE_ID);
-    }
-
-
+    private static final int REVIEWS = 300;
 
     private static final UriMatcher sUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
     static
@@ -56,9 +41,8 @@ public class MovieProvider extends ContentProvider
                 TRAILERS);
         sUriMatcher.addURI(
                 MovieContract.CONTENT_AUTHORITY,
-                MovieContract.PATH_MOVIES + "/#/" + MovieContract.PATH_MOVIE_TRAILER,
-                MOVIE_TRAILER);
-
+                MovieContract.PATH_REVIEWS,
+                REVIEWS);
     }
     /** Database helper object. All accesses to DB are done here */
     private MovieDbHelper mDbHelper;
@@ -88,39 +72,23 @@ public class MovieProvider extends ContentProvider
                 break;
 
             case MOVIES_ID:
-                selection = MovieEntry._ID + "=?";
+                selection = MovieEntry._mID + "=?";
                 selectionArgs = new String[] { String.valueOf(ContentUris.parseId(uri)) };
 
                 cursor = database.query(MovieEntry.TABLE_NAME, projection, selection,
                         selectionArgs, null, null, sortOrder);
                 break;
 
-
-            /** HOW can I convert this into a query method using projection selection, etc.? */
-            case MOVIE_TRAILER:
-                cursor = sMovieAndTrailerJoin
-                        .query(
-                                database,
-                                projection,
-                                selection,
-                                selectionArgs,
-                                null,
-                                null,
-                                sortOrder);
-                /*
-                cursor = database.rawQuery(
-                        "SELECT * FROM " +
-                        MovieEntry.TABLE_NAME +
-                        " INNER JOIN " +
-                        TrailerEntry.TABLE_NAME +
-                        " ON ( " +
-                        MovieEntry.TABLE_NAME + "." + MovieEntry.COLUMN_ID +
-                         " = " +
-                        TrailerEntry.TABLE_NAME + "." + TrailerEntry.COLUMN_MOVIE_ID + " )" +
-                        " WHERE " + MovieEntry.TABLE_NAME + "." + MovieEntry._ID + "=" + selection
-                        , null);
-                        */
+            case TRAILERS:
+                cursor = database.query(TrailerEntry.TABLE_NAME, projection, selection,
+                        selectionArgs, null, null, sortOrder);
                 break;
+
+            case REVIEWS:
+                cursor = database.query(ReviewEntry.TABLE_NAME, projection, selection,
+                        selectionArgs, null, null, sortOrder);
+                break;
+
             default:
                 throw new IllegalArgumentException("Cannot query, unknown URI " + uri);
         }
@@ -141,9 +109,6 @@ public class MovieProvider extends ContentProvider
             case MOVIES:
                 // Delete ALL rows that are NOT favorites per Loader instructions
                 rowsDeleted = database.delete(MovieEntry.TABLE_NAME, selection, selectionArgs);
-                break;
-            case TRAILERS:
-                rowsDeleted = database.delete(TrailerEntry.TABLE_NAME, selection, selectionArgs);
                 break;
             default:
                 throw new IllegalArgumentException("Deletion is not supported for " + uri);
@@ -168,7 +133,7 @@ public class MovieProvider extends ContentProvider
             case MOVIES:
                 return updateMovie(uri, contentValues, selection, selectionArgs);
             case MOVIES_ID:
-                selection = MovieEntry._ID + "=?";
+                selection = MovieEntry.MOVIE_POS + "=?";
                 selectionArgs = new String[] { String.valueOf(ContentUris.parseId(uri)) };
                 return updateMovie(uri, contentValues, selection, selectionArgs);
             default:
@@ -209,26 +174,45 @@ public class MovieProvider extends ContentProvider
     }
 
 
+
+    @Override
+    public Uri insert(@NonNull Uri uri, ContentValues values)
+    {
+        switch (sUriMatcher.match(uri))
+        {
+            case MOVIES:
+                SQLiteDatabase database = mDbHelper.getWritableDatabase();
+                long id = database.insert(MovieEntry.TABLE_NAME, null, values);
+                // If the ID is -1, then the insertion failed. Log an error and return null.
+                if (id == -1)
+                {
+                    Log.e(LOG_TAG, "Failed to insert row for " + uri);
+                    return null;
+                }
+                // Notify all listeners that the data has changed for content URI
+                getContext().getContentResolver().notifyChange(uri, null);
+                return ContentUris.withAppendedId(uri, id);
+            default:
+                throw new IllegalArgumentException("Insertion is not supported for " + uri);
+        }
+    }
+
+
+
     @Override
     public int bulkInsert(@NonNull Uri uri, @NonNull ContentValues[] values)
     {
         final SQLiteDatabase db = mDbHelper.getWritableDatabase();
+        int rowsInserted;
         switch (sUriMatcher.match(uri))
         {
-            // only MOVIES is supported obviously, insert into DB
-            case MOVIES:
+            case TRAILERS:
                 db.beginTransaction();
-                int rowsInserted = 0;
+                rowsInserted = 0;
                 try {
                     for (ContentValues value : values)
                     {
-                        // Check that the id is not null
-                        Integer id = value.getAsInteger(MovieEntry.COLUMN_ID);
-                        if (id == null)
-                        {
-                            throw new IllegalArgumentException("Movie requires an ID");
-                        }
-                        long _id = db.insert(MovieEntry.TABLE_NAME, null, value);
+                        long _id = db.insert(TrailerEntry.TABLE_NAME, null, value);
                         if (_id != -1)
                         {
                             rowsInserted++;
@@ -247,13 +231,13 @@ public class MovieProvider extends ContentProvider
                 // Return the number of rows inserted from our implementation of bulkInsert
                 return rowsInserted;
 
-            case TRAILERS:
+            case REVIEWS:
                 db.beginTransaction();
                 rowsInserted = 0;
                 try {
                     for (ContentValues value : values)
                     {
-                        long _id = db.insert(TrailerEntry.TABLE_NAME, null, value);
+                        long _id = db.insert(ReviewEntry.TABLE_NAME, null, value);
                         if (_id != -1)
                         {
                             rowsInserted++;
@@ -281,14 +265,6 @@ public class MovieProvider extends ContentProvider
 
 
     @Override
-    public Uri insert(@NonNull Uri uri, ContentValues contentValues)
-    {
-        // not implemented
-        Log.i(LOG_TAG, "Insert is not implemented in this app");
-        return null;
-    }
-
-    @Override
     public String getType(Uri uri)
     {
         final int match = sUriMatcher.match(uri);
@@ -300,6 +276,8 @@ public class MovieProvider extends ContentProvider
                 return MovieEntry.CONTENT_ITEM_TYPE;
             case TRAILERS:
                 return TrailerEntry.CONTENT_LIST_TYPE;
+            case REVIEWS:
+                return ReviewEntry.CONTENT_LIST_TYPE;
             default:
                 throw new IllegalStateException("Unknown URI " + uri + " with match " + match);
         }
