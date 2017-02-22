@@ -31,6 +31,11 @@ import eu.javimar.popularmovies.view.MovieAdapter;
 
 import static eu.javimar.popularmovies.Utils.API_KEY_TAG;
 import static eu.javimar.popularmovies.Utils.BASE_URL;
+import static eu.javimar.popularmovies.Utils.STATUS_SERVER_DOWN;
+import static eu.javimar.popularmovies.Utils.STATUS_SERVER_INVALID;
+import static eu.javimar.popularmovies.Utils.getServerStatus;
+import static eu.javimar.popularmovies.Utils.isNetworkAvailable;
+import static eu.javimar.popularmovies.Utils.sConnectToApi;
 import static eu.javimar.popularmovies.Utils.sMovieType;
 
 
@@ -56,9 +61,7 @@ public class MainActivity extends AppCompatActivity implements
     private static final int MOVIE_SERVER_LOADER = 90;
     private static final int MOVIE_DB_LOADER = 91;
 
-    /**
-     * URL bits and pieces for the themoviedb.org
-     */
+    /** URL bits and pieces for the themoviedb.org */
     private static final String TOP_RATED_PATH = "movie/top_rated";
     private static final String POPULAR_PATH = "movie/popular";
 
@@ -120,23 +123,21 @@ public class MainActivity extends AppCompatActivity implements
 
     private void startServerLoader(Bundle bundle)
     {
-        // show progress bar
-        setLoadingIndicatorVisible(true);
-
         // If there is a network connection, fetch data for toprated or popular
         if (Utils.isNetworkAvailable(this))
         {
+            if(sConnectToApi) {
+                // show progress bar
+                setLoadingIndicatorVisible(true);
+            }
+            else
+                setLoadingIndicatorVisible(true);
+
             getLoaderManager().initLoader(MOVIE_SERVER_LOADER, bundle, this);
         }
         else
         {
-            // not connected, show message
-            Utils.showSnackbar(this, mRecyclerView,
-                    getString(R.string.error_no_internet_connection));
-            // First, hide loading indicator so error message will be visible
-            setLoadingIndicatorVisible(false);
-            // Update empty state with no connection message
-            mErrorMessageDisplay.setText(R.string.error_no_internet_connection);
+            updateEmptyView();
         }
     }
 
@@ -148,7 +149,6 @@ public class MainActivity extends AppCompatActivity implements
     public Loader<Cursor> onCreateLoader(int id, Bundle args)
     {
         String movieType;
-
         switch (id)
         {
             case MOVIE_SERVER_LOADER:
@@ -224,44 +224,25 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor cursor)
     {
-        int id = loader.getId();
-        setLoadingIndicatorVisible(false);
-
-        switch (id)
+        switch (loader.getId())
         {
             case MOVIE_SERVER_LOADER:
-                if ((cursor == null || cursor.getCount() < 1))
-                {
-                    // error retrieving movies from server
-                    mErrorMessageDisplay.setText(R.string.error_retrieving_movies);
-                }
+                setLoadingIndicatorVisible(false);
                 break;
             case MOVIE_DB_LOADER:
-                if (cursor == null || cursor.getCount() < 1)
-                {
-                    if (sMovieType.equals(FAVORITE))
-                    {
-                        // update empty state with no favorites stored
-                        mErrorMessageDisplay.setText(R.string.error_no_favorites);
-                    }
-                }
-                else
-                {
-                    mErrorMessageDisplay.setText("");
-                }
                 // Update CursorAdapter with new cursor containing updated movie data
                 mMovieAdapter.swapCursor(cursor);
                 mRecyclerView.invalidate();
                 break;
         }
+        updateEmptyView();
     }
 
     @Override
     public void onLoaderReset(Loader<Cursor> loader)
     {
-        int id = loader.getId();
-        // Loader reset, so we can clear out our existing data.
-        switch (id)
+        // Loader reset, clear out our existing data.
+        switch (loader.getId())
         {
             case MOVIE_DB_LOADER:
                 mMovieAdapter.swapCursor(null);
@@ -273,7 +254,7 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onSharedPreferenceChanged(SharedPreferences pref, String key)
     {
-        if (key.equals(getString(R.string.settings_order_by_key))) // ORDER_BY, for this app it's always true
+        if (key.equals(getString(R.string.settings_order_by_key)))
         {
             sMovieType = getPreferenceOrderBy();
             Bundle bundle = new Bundle();
@@ -285,23 +266,71 @@ public class MainActivity extends AppCompatActivity implements
                 // favorite => never do network request
                 return;
             }
-
             if (Utils.isNetworkAvailable(this))
             {
+                // show loading again
+                setLoadingIndicatorVisible(true);
                 // only valid for top_rated or popular, refresh and display again
-                Utils.sConnectToApi = true;
+                sConnectToApi = true;
                 getLoaderManager().restartLoader(MOVIE_SERVER_LOADER, bundle, this);
                 getLoaderManager().restartLoader(MOVIE_DB_LOADER, bundle, this);
             }
             else
             {
                 getLoaderManager().restartLoader(MOVIE_DB_LOADER, bundle, this);
-                // not connected, show message
-                setLoadingIndicatorVisible(false);
-                mErrorMessageDisplay.setText(R.string.error_no_internet_connection);
                 Utils.showSnackbar(this, mRecyclerView,
                         getString(R.string.error_no_internet_connection));
             }
+        }
+        else if(key.equals(getString(R.string.pref_server_status_key)))
+        {
+            // server status key
+            updateEmptyView();
+        }
+
+    }
+
+
+    /**
+     * Updates the empty list view with contextually relevant information that the user can use
+     * to determine why they aren't seeing movies.
+     */
+    private void updateEmptyView()
+    {
+        if (mMovieAdapter.getItemCount() == 0)
+        {
+            if (null != mErrorMessageDisplay)
+            {
+                int message = R.string.error_empty; // default error
+                @Utils.ServerStatus int code = getServerStatus(this);
+                switch(code)
+                {
+                    case STATUS_SERVER_DOWN:
+                        message = R.string.error_server_down;
+                        break;
+                    case STATUS_SERVER_INVALID:
+                        message = R.string.error_server_error;
+                        break;
+                    default:
+                        if (!isNetworkAvailable(this))
+                        {
+                            message = R.string.error_no_internet_connection;
+                            Utils.showSnackbar(this, mRecyclerView,
+                                    getString(R.string.error_no_internet_connection));
+                        }
+                }
+                mErrorMessageDisplay.setText(message);
+            }
+            // override message if we are dealing with favorites
+            if (sMovieType.equals(FAVORITE))
+            {
+                // override empty state with no favorites stored
+                mErrorMessageDisplay.setText(R.string.error_no_favorites);
+            }
+        }
+        else
+        {
+            mErrorMessageDisplay.setText("");
         }
     }
 
@@ -318,8 +347,8 @@ public class MainActivity extends AppCompatActivity implements
             mLoadingIndicator.setVisibility(View.GONE);
             mErrorMessageDisplay.setVisibility(View.VISIBLE);
         }
-
     }
+
 
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState)
@@ -365,6 +394,7 @@ public class MainActivity extends AppCompatActivity implements
             getSupportActionBar().setSubtitle(R.string.settings_order_by_fav_label);
         }
     }
+
 
 
     @Override

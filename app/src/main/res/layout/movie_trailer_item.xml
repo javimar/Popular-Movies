@@ -1,12 +1,14 @@
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_height="wrap_content"
-    android:layout_width="wrap_content"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_height="match_parent"
+    android:layout_width="match_parent"
     android:orientation="horizontal"
-    android:layout_margin="10dp"
-    android:paddingBottom="20dp"
-    xmlns:tools="http://schemas.android.com/tools">
+    android:padding="16dp"
+
+    android:background="@drawable/list_item_selector"
+    android:paddingBottom="20dp">
 
     <ImageView
         android:id="@+id/iv_trailer"
@@ -15,15 +17,18 @@
         android:elevation="5dp"
         app:srcCompat="@drawable/play_button"
         android:clickable="true"/>
+
     <TextView
         android:id="@+id/tv_trailer"
         tools:text="Casablanca"
-        android:layout_marginTop="7dp"
-        android:layout_marginLeft="10dp"
+        android:padding="16dp"
+        android:layout_marginRight="16dp"
         android:fontFamily="sans-serif"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="20sp"
+        android:textSize="18sp"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:textColor="@color/colorPrimaryDark"/>
 
 </LinearLayout>

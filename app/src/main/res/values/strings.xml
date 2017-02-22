@@ -9,8 +9,10 @@
     <string name="menu_item_settings">Settings</string>
 
     <!-- ERROR messages -->
+    <string name="error_empty">No movie information available.</string>
     <string name="error_no_internet_connection">Could not connect to the Internet</string>
-    <string name="error_retrieving_movies">There was an error while accesing the server</string>
+    <string name="error_server_down">No movie information available. The server is not returning data</string>
+    <string name="error_server_error">No movie information available. The server is not returning valid data.</string>
     <string name="error_movie_in_db">%1$s is already in Favorites</string>
     <string name="error_movie_delete">There was an error while deleting the movie</string>
     <string name="error_no_favorites">There were no favorites stored. Go ahead and choose one</string>
@@ -18,14 +20,13 @@
 
 
     <!-- Strings For Detail Screen -->
-    <string name="detail_ratings_literal" translatable="false">%1$s/10</string>
+    <string name="detail_ratings_literal_10" translatable="false">/10</string>
     <string name="detail_date_literal">Year: %1$s</string>
     <string name="detail_movie_added">%1$s has been added to Favorites</string>
     <string name="detail_movie_delete">%1$s has been deleted from Favorites</string>
     <string name="detail_trailers_tag">TRAILERS</string>
     <string name="detail_reviews_tag">REVIEWS</string>
     <string name="detail_choose_web_action">Choose an app to open the URL</string>
-
 
 
 
@@ -43,5 +44,9 @@
     <!-- Favorites -->
     <string name="settings_order_by_fav_label">Favorites</string>
     <string name="settings_order_by_fav_value" translatable="false">favorites</string>
+
+    <!-- Key name for storing server status in sharedPreferences -->
+    <string name="pref_server_status_key" translatable="false">server_status</string>
+
 
 </resources>

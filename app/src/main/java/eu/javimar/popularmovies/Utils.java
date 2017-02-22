@@ -2,10 +2,13 @@ package eu.javimar.popularmovies;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.preference.PreferenceManager;
+import android.support.annotation.IntDef;
 import android.support.design.widget.Snackbar;
 import android.support.v4.content.ContextCompat;
 import android.text.TextUtils;
@@ -21,6 +24,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -28,7 +33,6 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
-import eu.javimar.popularmovies.model.MovieContract;
 import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
 import eu.javimar.popularmovies.model.MovieContract.TrailerEntry;
 import eu.javimar.popularmovies.model.MovieContract.ReviewEntry;
@@ -38,6 +42,16 @@ import eu.javimar.popularmovies.model.MovieContract.ReviewEntry;
 public final class Utils
 {
     private static final String LOG_TAG = Utils.class.getSimpleName();
+
+
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({STATUS_SERVER_OK, STATUS_SERVER_DOWN, STATUS_SERVER_INVALID, STATUS_SERVER_UNKNOWN})
+    public @interface ServerStatus {}
+    public static final int STATUS_SERVER_OK = 0;
+    public static final int STATUS_SERVER_DOWN = 1;
+    public static final int STATUS_SERVER_INVALID = 2;
+    public static final int STATUS_SERVER_UNKNOWN = 3;
+
 
     /** URLs */
     public static final String BASE_URL = "http://api.themoviedb.org/3";
@@ -60,7 +74,7 @@ public final class Utils
     public static final int MOVIE_ADAPTER = 60;
     public static final int DETAIL_ACTIVITY = 61;
 
-    /**  Boolean flag used so that AsyncTaskLoader only connects to the API once per run */
+    /**  Boolean flag used so that AsyncTaskLoader only connects to the API once per "run" */
     public static boolean sConnectToApi = true;
 
     /** Store the value of the settings preference. FAV, POPULAR or TOP_RATED */
@@ -80,36 +94,18 @@ public final class Utils
         String jsonResponse = null;
         try
         {
-            jsonResponse = makeHttpRequest(url);
-        }
-        catch (IOException e)
-        {
-            Log.e(LOG_TAG, "Problem making the HTTP request.", e);
-        }
+            jsonResponse = makeHttpRequest(url, context);
+            if (TextUtils.isEmpty(jsonResponse))
+            {
+                setServerStatus(context, STATUS_SERVER_DOWN);
+                return;
+            }
 
         // 3. Extract relevant fields from the JSON response and create a list of content values
-        extractMoviesFromJson(jsonResponse, context);
-    }
-
-
-
-    private static void extractMoviesFromJson(String movieJSON, Context context)
-    {
-        // If the JSON string is empty or null, return early.
-        if (TextUtils.isEmpty(movieJSON)) {
-            return;
-        }
-        // initialize
-        ContentValues movieCv;
-        int movie_id = 0;
-
-        // Try to parse the JSON response string. If there's a problem with the way the JSON
-        // is formatted, a JSONException exception object will be thrown.
-        // Catch the exception so the app doesn't crash, and print the error message to the logs.
-        try
-        {
+            ContentValues movieCv;
+            int movie_id = 0;
             // Create a JSONObject from the JSON response string
-            JSONObject baseJsonResponse = new JSONObject(movieJSON);
+            JSONObject baseJsonResponse = new JSONObject(jsonResponse);
 
             // Extract the JSONArray associated with the key called "results",
             // which represents a list of movies.
@@ -148,6 +144,12 @@ public final class Utils
                             sReviewsCv.toArray(new ContentValues[sReviewsCv.size()]));
                 }
             }
+            setServerStatus(context, STATUS_SERVER_OK);
+        }
+        catch (IOException e)
+        {
+            Log.e(LOG_TAG, "Problem making the HTTP request.", e);
+            setServerStatus(context, STATUS_SERVER_DOWN);
         }
         catch (JSONException e)
         {
@@ -155,8 +157,10 @@ public final class Utils
             // catch the exception here, so the app doesn't crash. Print a log message
             // with the message from the exception.
             Log.e(LOG_TAG, "Problem parsing the movies JSON results", e);
+            setServerStatus(context, STATUS_SERVER_INVALID);
         }
     }
+
 
 
     /**
@@ -180,7 +184,7 @@ public final class Utils
         String jsonResponse = null;
         try
         {
-            jsonResponse = makeHttpRequest(url);
+            jsonResponse = makeHttpRequest(url, context);
         }
         catch (IOException e)
         {
@@ -240,7 +244,7 @@ public final class Utils
         String jsonResponse = null;
         try
         {
-            jsonResponse = makeHttpRequest(url);
+            jsonResponse = makeHttpRequest(url, context);
         }
         catch (IOException e)
         {
@@ -300,7 +304,7 @@ public final class Utils
     /**
      * Make an HTTP request to the given URL and return a String as the response.
      */
-    private static String makeHttpRequest(URL url) throws IOException
+    private static String makeHttpRequest(URL url, Context context) throws IOException
     {
         String jsonResponse = "";
 
@@ -426,4 +430,24 @@ public final class Utils
     }
 
 
+    /**
+     * Sets the server status into shared preference.  This function should not be called from
+     * the UI thread because it uses commit to write to the shared preferences instead to apply.
+     */
+    private static void setServerStatus(Context c, @ServerStatus int serverStatus)
+    {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(c);
+        SharedPreferences.Editor spe = sp.edit();
+        spe.putInt(c.getString(R.string.pref_server_status_key), serverStatus);
+        spe.commit();
+    }
+
+    /**
+     * Gets the server status from shared preference.
+     */
+    public static @ServerStatus int getServerStatus(Context c)
+    {
+        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(c);
+        return pref.getInt(c.getString(R.string.pref_server_status_key),STATUS_SERVER_UNKNOWN);
+    }
 }

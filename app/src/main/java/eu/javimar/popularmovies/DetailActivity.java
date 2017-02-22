@@ -5,12 +5,17 @@ import android.content.ContentValues;
 import android.content.CursorLoader;
 import android.content.Intent;
 import android.content.Loader;
+import android.content.res.Configuration;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.graphics.Palette;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -42,7 +47,7 @@ public class DetailActivity extends AppCompatActivity
     @BindView(R.id.fab) FloatingActionButton fab;
     @BindView(R.id.toolbar) Toolbar toolbar;
     @BindView(R.id.collapse_toolbar) CollapsingToolbarLayout collapsingToolbarLayout;
-    @BindView(R.id.imgToolbarParallax) ImageView mImgToolbarParallax;
+    @Nullable @BindView(R.id.imgToolbarParallax) ImageView mImgToolbarParallax;
     @BindView(R.id.movieTrailerContainer) LinearLayout mMovieTrailerContainer;
     TextView mTvTrailer, mTvReviewAuthor, mTvReviewBody;
 
@@ -170,8 +175,7 @@ public class DetailActivity extends AppCompatActivity
                     return;
                 }
                 // Proceed with moving to the first row of the cursor and reading data from it
-                if (cursor.moveToFirst())
-                {
+                if (cursor.moveToFirst()) {
                     // Find the columns of movie attributes that we're interested in
                     int idColumnIndex = cursor.getColumnIndex(MovieEntry.COLUMN_ID);
                     int titleColumnIndex = cursor.getColumnIndex(MovieEntry.COLUMN_TITLE);
@@ -189,19 +193,22 @@ public class DetailActivity extends AppCompatActivity
                     mTvSynopsis.setText(overview);
                     // display only year
                     mTvReleaseDate.setText(date.substring(0, 4));
-                    mTvRating.setText(String.format(getString(R.string.detail_ratings_literal),
-                            String.valueOf(rating)));
+                    mTvRating.setText(String.valueOf(rating));
                     Picasso
                             .with(this)
                             .load(Utils.buildPosterUrl(cursor, Utils.DETAIL_ACTIVITY))
                             .placeholder(R.drawable.placeholder)
                             .error(R.drawable.error_image)
                             .into(mIvPlacePoster);
-                    Picasso
-                            .with(this)
-                            .load(Utils.buildPosterUrl(cursor, Utils.DETAIL_ACTIVITY))
-                            .error(R.drawable.error_image)
-                            .into(mImgToolbarParallax);
+                    if (getResources().getConfiguration().orientation ==
+                            Configuration.ORIENTATION_PORTRAIT)
+                    {
+                        Picasso
+                                .with(this)
+                                .load(Utils.buildPosterUrl(cursor, Utils.DETAIL_ACTIVITY))
+                                .error(R.drawable.error_image)
+                                .into(mImgToolbarParallax);
+                    }
                 }
 
                 // This is a good spot to take care of member variables
@@ -391,6 +398,7 @@ public class DetailActivity extends AppCompatActivity
         }
         return false;
     }
+
 
 
     @Override
