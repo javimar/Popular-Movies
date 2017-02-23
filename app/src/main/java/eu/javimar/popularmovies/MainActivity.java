@@ -126,13 +126,15 @@ public class MainActivity extends AppCompatActivity implements
         // If there is a network connection, fetch data for toprated or popular
         if (Utils.isNetworkAvailable(this))
         {
-            if(sConnectToApi) {
+            if(sConnectToApi)
+            {
                 // show progress bar
                 setLoadingIndicatorVisible(true);
             }
             else
-                setLoadingIndicatorVisible(true);
-
+            {
+                setLoadingIndicatorVisible(false);
+            }
             getLoaderManager().initLoader(MOVIE_SERVER_LOADER, bundle, this);
         }
         else

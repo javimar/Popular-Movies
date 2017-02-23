@@ -286,6 +286,7 @@ public class DetailActivity extends AppCompatActivity
                 mMovieTrailerContainer.addView(LayoutInflater.from(this)
                         .inflate(R.layout.review_divider, null));
                 //traverse the reviews, and create views programmatically
+                cursor.moveToPosition(-1);
                 while (cursor.moveToNext())
                 {
                     String author = cursor.getString(cursor.getColumnIndex(ReviewEntry.COLUMN_AUTHOR));
