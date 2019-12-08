@@ -1,4 +1,5 @@
 package eu.javimar.popularmovies;
+
 import android.app.LoaderManager;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -7,17 +8,11 @@ import android.content.Intent;
 import android.content.Loader;
 import android.content.res.Configuration;
 import android.database.Cursor;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.design.widget.CollapsingToolbarLayout;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.graphics.Palette;
-import android.support.v7.widget.Toolbar;
-import android.util.Log;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -25,6 +20,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.google.android.material.appbar.CollapsingToolbarLayout;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.squareup.picasso.Picasso;
 
 import butterknife.BindView;
@@ -37,8 +34,6 @@ import eu.javimar.popularmovies.model.MovieContract.ReviewEntry;
 public class DetailActivity extends AppCompatActivity
                 implements LoaderManager.LoaderCallbacks<Cursor>
 {
-    private static final String LOG_TAG = DetailActivity.class.getSimpleName();
-
     @BindView(R.id.tv_title) TextView mTvMovieTitle;
     @BindView(R.id.placePoster) ImageView mIvPlacePoster;
     @BindView(R.id.tv_date) TextView mTvReleaseDate;
@@ -49,6 +44,7 @@ public class DetailActivity extends AppCompatActivity
     @BindView(R.id.collapse_toolbar) CollapsingToolbarLayout collapsingToolbarLayout;
     @Nullable @BindView(R.id.imgToolbarParallax) ImageView mImgToolbarParallax;
     @BindView(R.id.movieTrailerContainer) LinearLayout mMovieTrailerContainer;
+
     TextView mTvTrailer, mTvReviewAuthor, mTvReviewBody;
 
 
@@ -195,7 +191,7 @@ public class DetailActivity extends AppCompatActivity
                     mTvReleaseDate.setText(date.substring(0, 4));
                     mTvRating.setText(String.valueOf(rating));
                     Picasso
-                            .with(this)
+                            .get()
                             .load(Utils.buildPosterUrl(cursor, Utils.DETAIL_ACTIVITY))
                             .placeholder(R.drawable.placeholder)
                             .error(R.drawable.error_image)
@@ -204,7 +200,7 @@ public class DetailActivity extends AppCompatActivity
                             Configuration.ORIENTATION_PORTRAIT)
                     {
                         Picasso
-                                .with(this)
+                                .get()
                                 .load(Utils.buildPosterUrl(cursor, Utils.DETAIL_ACTIVITY))
                                 .error(R.drawable.error_image)
                                 .into(mImgToolbarParallax);
@@ -230,14 +226,9 @@ public class DetailActivity extends AppCompatActivity
                     fab.setImageResource(R.drawable.ic_nofavorite_heart);
                 }
                 // add listener to FAB
-                fab.setOnClickListener(new View.OnClickListener()
-                {
-                    @Override
-                    public void onClick(View view)
-                    {
-                        // add/delete movie to/from database
-                        updateMovieFavorite();
-                    }
+                fab.setOnClickListener(view -> {
+                    // add/delete movie to/from database
+                    updateMovieFavorite();
                 });
                 break;
 
@@ -252,7 +243,6 @@ public class DetailActivity extends AppCompatActivity
                 mMovieTrailerContainer.addView(LayoutInflater.from(this)
                         .inflate(R.layout.trailer_divider, null));
 
-    //Log.d(LOG_TAG, "JAVIER JOIN CURSOR= " + DatabaseUtils.dumpCursorToString(cursor));
                 // Go back to first element, traverse the trailers, and create views programmatically
                 cursor.moveToPosition(-1);
                 while (cursor.moveToNext())
@@ -264,12 +254,7 @@ public class DetailActivity extends AppCompatActivity
                     View movieTrailerItem = LayoutInflater.from(this)
                             .inflate(R.layout.movie_trailer_item, null);
 
-                    movieTrailerItem.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View view) {
-                            playYouTubeTrailerIntent(trailer_key);
-                        }
-                    });
+                    movieTrailerItem.setOnClickListener(view -> playYouTubeTrailerIntent(trailer_key));
                     mTvTrailer = (TextView)movieTrailerItem.findViewById(R.id.tv_trailer);
                     mTvTrailer.setText(name);
                     mMovieTrailerContainer.addView(movieTrailerItem);
@@ -294,9 +279,9 @@ public class DetailActivity extends AppCompatActivity
 
                     View reviewTrailerItem = LayoutInflater.from(this)
                             .inflate(R.layout.movie_review_item, null);
-                    mTvReviewAuthor = (TextView)reviewTrailerItem.findViewById(R.id.tv_review_author);
+                    mTvReviewAuthor = reviewTrailerItem.findViewById(R.id.tv_review_author);
                     mTvReviewAuthor.setText(author);
-                    mTvReviewBody = (TextView)reviewTrailerItem.findViewById(R.id.tv_review_body);
+                    mTvReviewBody = reviewTrailerItem.findViewById(R.id.tv_review_body);
                     mTvReviewBody.setText(review);
 
                     mMovieTrailerContainer.addView(reviewTrailerItem);
@@ -306,11 +291,7 @@ public class DetailActivity extends AppCompatActivity
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
-        // is there anything to do here?
-    }
-
-
+    public void onLoaderReset(Loader<Cursor> loader) { }
 
     // Build the URL and connect via Intent to https://youtu.be/key
     private void playYouTubeTrailerIntent(String key)

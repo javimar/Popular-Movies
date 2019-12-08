@@ -1,4 +1,4 @@
-<android.support.v4.widget.NestedScrollView
+<androidx.core.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -80,7 +80,6 @@
                     tools:text="6.9" />
 
                 <TextView
-                    android:id="@+id/tv_rating_10"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -105,4 +104,4 @@
         </RelativeLayout>
 
     </LinearLayout>
-</android.support.v4.widget.NestedScrollView>
+</androidx.core.widget.NestedScrollView>

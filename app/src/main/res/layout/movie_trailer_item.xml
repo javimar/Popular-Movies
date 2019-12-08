@@ -11,18 +11,18 @@
     android:paddingBottom="20dp">
 
     <ImageView
-        android:id="@+id/iv_trailer"
         android:layout_width="50dp"
         android:layout_height="50dp"
         android:elevation="5dp"
         app:srcCompat="@drawable/play_button"
-        android:clickable="true"/>
+        android:clickable="true"
+        android:focusable="true" />
 
     <TextView
         android:id="@+id/tv_trailer"
         tools:text="Casablanca"
         android:padding="16dp"
-        android:layout_marginRight="16dp"
+        android:layout_marginEnd="16dp"
         android:fontFamily="sans-serif"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

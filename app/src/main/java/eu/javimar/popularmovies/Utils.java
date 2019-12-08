@@ -8,13 +8,14 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.preference.PreferenceManager;
-import android.support.annotation.IntDef;
-import android.support.design.widget.Snackbar;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.IntDef;
+import androidx.core.content.ContextCompat;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+
+import com.google.android.material.snackbar.Snackbar;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -37,8 +38,6 @@ import eu.javimar.popularmovies.model.MovieContract.MovieEntry;
 import eu.javimar.popularmovies.model.MovieContract.TrailerEntry;
 import eu.javimar.popularmovies.model.MovieContract.ReviewEntry;
 
-
-@SuppressWarnings("All")
 public final class Utils
 {
     private static final String LOG_TAG = Utils.class.getSimpleName();
@@ -46,42 +45,39 @@ public final class Utils
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({STATUS_SERVER_OK, STATUS_SERVER_DOWN, STATUS_SERVER_INVALID, STATUS_SERVER_UNKNOWN})
-    public @interface ServerStatus {}
-    public static final int STATUS_SERVER_OK = 0;
-    public static final int STATUS_SERVER_DOWN = 1;
-    public static final int STATUS_SERVER_INVALID = 2;
-    public static final int STATUS_SERVER_UNKNOWN = 3;
+    @interface ServerStatus {}
+    static final int STATUS_SERVER_OK = 0;
+    static final int STATUS_SERVER_DOWN = 1;
+    static final int STATUS_SERVER_INVALID = 2;
+    static final int STATUS_SERVER_UNKNOWN = 3;
 
 
     /** URLs */
-    public static final String BASE_URL = "http://api.themoviedb.org/3";
-    public static final String BASE_POSTER_URL = "http://image.tmdb.org/t/p";
+    static final String BASE_URL = "http://api.themoviedb.org/3";
+    private static final String BASE_POSTER_URL = "http://image.tmdb.org/t/p";
 
     /** URL bits and pieces to form URLs */
-    public static final String MOVIE_PATH = "movie";
-    public static final String VIDEOS_PATH = "videos";
-    public static final String REVIEWS_PATH = "reviews";
-    public static final String API_KEY_TAG = "api_key";
-    //http://api.themoviedb.org/3/movie/ID/videos?api_key=API_KEY
-    //http://api.themoviedb.org/3/movie/ID/reviews?api_key=API_KEY
+    private static final String MOVIE_PATH = "movie";
+    private static final String VIDEOS_PATH = "videos";
+    private static final String REVIEWS_PATH = "reviews";
+    static final String API_KEY_TAG = "api_key";
 
     /** Poster sizes */
     private static final String SIZE185 = "w185";
-    private static final String SIZE500 = "w500";
     private static final String SIZE342 = "w342";
 
     /** Constants to build correct poster URL */
     public static final int MOVIE_ADAPTER = 60;
-    public static final int DETAIL_ACTIVITY = 61;
+    static final int DETAIL_ACTIVITY = 61;
 
     /**  Boolean flag used so that AsyncTaskLoader only connects to the API once per "run" */
     public static boolean sConnectToApi = true;
 
     /** Store the value of the settings preference. FAV, POPULAR or TOP_RATED */
-    public static String sMovieType;
+    static String sMovieType;
 
     /** CV lists to bulk insert into this 2 DBs */
-    public static List<ContentValues> sTrailersCv, sReviewsCv;
+    static List<ContentValues> sTrailersCv, sReviewsCv;
 
 
     // Get all movie info asynchronously
@@ -162,7 +158,6 @@ public final class Utils
     }
 
 
-
     /**
      * Init point to process trailers table
      */
@@ -220,7 +215,6 @@ public final class Utils
             Log.e(LOG_TAG, "Problem parsing the trailers JSON results", e);
         }
     }
-
 
 
     /**
@@ -384,7 +378,7 @@ public final class Utils
     /** HELPER METHODS */
 
     /** Returns true if the network is connected or about to become available */
-    public static boolean isNetworkAvailable(Context c)
+    static boolean isNetworkAvailable(Context c)
     {
         // Get a reference to the ConnectivityManager to check state of network connectivity
         ConnectivityManager cm =
@@ -396,13 +390,12 @@ public final class Utils
 
 
     /** Displays less boring snackbar messages */
-    public static void showSnackbar (Context context, View view, String message)
+    static void showSnackbar (Context context, View view, String message)
     {
         Snackbar snack = Snackbar.make(view, message, Snackbar.LENGTH_LONG);
         View sbview = snack.getView();
         sbview.setBackgroundColor(ContextCompat.getColor(context, R.color.colorPrimary));
-        TextView textView =
-                (TextView) sbview.findViewById(android.support.design.R.id.snackbar_text);
+        TextView textView = sbview.findViewById(com.google.android.material.R.id.snackbar_text);
         textView.setTextColor(ContextCompat.getColor(context, R.color.colorAccent));
         snack.show();
     }
@@ -445,7 +438,7 @@ public final class Utils
     /**
      * Gets the server status from shared preference.
      */
-    public static @ServerStatus int getServerStatus(Context c)
+    static @ServerStatus int getServerStatus(Context c)
     {
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(c);
         return pref.getInt(c.getString(R.string.pref_server_status_key),STATUS_SERVER_UNKNOWN);

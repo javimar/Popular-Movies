@@ -11,12 +11,14 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.preference.PreferenceManager;
-import android.support.design.widget.CollapsingToolbarLayout;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.Toolbar;
-import android.util.Log;
+import com.google.android.material.appbar.CollapsingToolbarLayout;
+import androidx.appcompat.app.AppCompatActivity;
+
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import androidx.appcompat.widget.Toolbar;
+
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;

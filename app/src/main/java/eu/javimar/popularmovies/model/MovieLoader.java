@@ -3,7 +3,6 @@ package eu.javimar.popularmovies.model;
 import android.content.AsyncTaskLoader;
 import android.content.Context;
 import android.database.Cursor;
-import android.util.Log;
 
 import eu.javimar.popularmovies.Utils;
 import eu.javimar.popularmovies.model.MovieContract.MovieEntry;

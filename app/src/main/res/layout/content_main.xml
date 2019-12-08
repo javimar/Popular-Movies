@@ -1,4 +1,4 @@
-<android.support.v4.widget.NestedScrollView
+<androidx.core.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <android.support.v7.widget.RecyclerView
+        <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_view_movies"
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
@@ -26,4 +26,4 @@
 
     </FrameLayout>
 
-</android.support.v4.widget.NestedScrollView>
+</androidx.core.widget.NestedScrollView>

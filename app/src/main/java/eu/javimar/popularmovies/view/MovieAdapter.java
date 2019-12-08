@@ -2,11 +2,12 @@ package eu.javimar.popularmovies.view;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.squareup.picasso.Picasso;
 
@@ -73,7 +74,7 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
         mCursor.moveToPosition(position);
 
         Picasso
-                .with(mContext)
+                .get()
                 .load(Utils.buildPosterUrl(mCursor, Utils.MOVIE_ADAPTER))
                 .placeholder(R.drawable.placeholder)
                 .error(R.drawable.error_image)

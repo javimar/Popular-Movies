@@ -6,7 +6,6 @@
     android:layout_height="match_parent">
 
     <View
-        android:id="@+id/review_divider_line"
         android:layout_width="match_parent"
         android:layout_height="2dp"
         android:layout_margin="10dp"
